@@ -1,0 +1,2822 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>TAS Tool</title>
+    <link rel="stylesheet" href="tas-tool.css">
+</head>
+
+<body>
+    <header>
+        <h1 style="margin:0;font-weight:600;font-size:16px">TAS Tool</h1>
+    </header>
+    <main>
+        <div class="ghosts">
+            <h2>Ghosts</h2>
+            <div class="row" style="gap:6px">
+                <button id="gh-show-all">Show all</button>
+                <button id="gh-hide-all">Hide all</button>
+            </div>
+            <div id="ghosts" class="ghosts-list"></div>
+        </div>
+
+
+        <div class="section-decoded">
+            <label>Decoded (human-readable)</label>
+            <div class="findbar" id="findbar" style="display:none;gap:8px;align-items:center;margin:4px 0">
+                <input id="find" placeholder="Find..." style="width:100%;background:#0f0f17;color:#eee;border:1px solid #2a2a3a;border-radius:6px;padding:6px 10px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;font-size:12px;">
+                <span id="find-count" style="font-size:12px;color:#bbb;margin:0 4px"></span>
+                <button id="find-prev">Prev</button>
+                <button id="find-next">Next</button>
+                <button id="find-close">Close</button>
+            </div>
+            <textarea id="decoded" spellcheck="false" class="decoded-editor" placeholder="Decoded ghost input"></textarea>
+            <div id="decoded-overlay" class="decoded-overlay"></div>
+            <div class="decoded-scroll">
+                <button id="decoded-scroll-up" title="Scroll to top">▲</button>
+                <button id="decoded-scroll-down" title="Scroll to bottom">▼</button>
+            </div>
+        </div>
+
+        <div id="command-row" style="display: flex; gap: 8px; align-items: center;">
+            <input id="command" placeholder="e.g., tap 1150 1205 wd 10 5  OR  hold wd for 120 at 2000" style="background: #0f0f17; color: #eee; border: 1px solid #2a2a3a; border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px;">
+            <button id="execute" style="flex-shrink: 0;">Execute Command</button>
+        </div>
+
+        <div class="section-controls">
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+                <input id="offset-ms" type="number" placeholder="Offset selected (ms)" style="width:160px;background:#0f0f17;color:#eee;border:1px solid #2a2a3a;border-radius:6px;padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:12px;">
+                <button id="offset-apply">Apply Offset</button>
+            </div>
+
+            <div style="display:flex;gap:8px">
+                <button id="bookmarks-open">Bookmarks</button>
+                <button id="save-file">Save to File</button>
+                <button id="load-file">Load from File</button>
+                <button id="copy">Copy</button>
+                <button id="clear">Clear</button>
+                <button id="apply">Apply</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="palette-overlay" class="palette-overlay">
+        <div class="palette">
+            <input id="palette-input" class="palette-input" placeholder="Type a command: tap, hold, frame #, label...">
+            <div id="palette-list" class="palette-list"></div>
+        </div>
+    </div>
+
+    <div id="bookmarks-overlay" class="palette-overlay">
+        <div class="palette">
+            <div style="display:flex;gap:8px;align-items:center;border-bottom:1px solid #2a2a3a">
+                <input id="bookmarks-filter" class="palette-input" placeholder="Filter labels...">
+                <button id="bookmark-add-current" title="Add label at caret (Ctrl+Shift+B)">Add at caret</button>
+                <button id="bookmark-add-by-frame" title="Add label at frame">Add at frame</button>
+            </div>
+            <div id="bookmarks-list" class="palette-list"></div>
+        </div>
+    </div>
+
+    <script>
+        var $ = function(id) {
+            return document.getElementById(id);
+        };
+        var setVal = function(v) {
+            var el = $("encoded");
+            if (el) el.value = v || "";
+        };
+
+        // Simplified editor state helpers (no syntax highlighting)
+        var setHuman = function(v) {
+            var d = $("decoded");
+            if (d) {
+                d.value = v || "";
+                d.textContent = v || "";
+            }
+        };
+
+        function renderGhosts(data) {
+            try {
+                var root = $("ghosts");
+                if (!root) return;
+                root.textContent = "";
+                if (!data || !Array.isArray(data.names)) return;
+                var names = data.names || [];
+                var sel = typeof data.selected === "number" ? data.selected : -1;
+                var vis = Array.isArray(data.visibility) ? data.visibility.map(v => v !== false) : names.map(() => true);
+                var colors = Array.isArray(data.colors) ? data.colors : null;
+                var colors2 = Array.isArray(data.secondaryColors) ? data.secondaryColors : null;
+                names.forEach(function(name, idx) {
+                    var row = document.createElement('div');
+                    row.className = 'ghost-item';
+                    var cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.checked = !!vis[idx];
+                    cb.disabled = (idx === sel);
+                    cb.addEventListener('change', function() {
+                        vis[idx] = cb.checked;
+                        try {
+                            window.electron.tasToolSetVisibility(vis);
+                        } catch (e) {}
+                    });
+                    var colorDot = document.createElement('span');
+                    colorDot.className = 'ghost-color';
+                    try {
+                        var c1 = colors && colors[idx] && typeof colors[idx] === 'string' ? colors[idx] : null;
+                        var c2 = colors2 && colors2[idx] && typeof colors2[idx] === 'string' ? colors2[idx] : null;
+                        if (c1 && c2) {
+                            colorDot.style.background = 'linear-gradient(90deg, ' + c1 + ' 50%, ' + c2 + ' 50%)';
+                        } else if (c1) {
+                            colorDot.style.background = c1;
+                        } else if (c2) {
+                            colorDot.style.background = c2;
+                        }
+                    } catch (e) {}
+                    var lab = document.createElement('span');
+                    lab.className = 'ghost-name';
+                    lab.textContent = (idx === sel ? '[TAS] ' : '') + name;
+                    var btn = document.createElement('button');
+                    btn.textContent = 'Load';
+                    btn.title = 'Load this ghost into editor';
+                    btn.addEventListener('click', function() {
+                        try {
+                            window.electron.tasToolRequestLoad(idx);
+                        } catch (e) {}
+                    });
+                    row.appendChild(cb);
+                    row.appendChild(colorDot);
+                    row.appendChild(lab);
+                    row.appendChild(btn);
+                    root.appendChild(row);
+                });
+                var sh = $("gh-show-all"),
+                    hd = $("gh-hide-all");
+                if (sh) sh.onclick = function() {
+                    for (var i = 0; i < vis.length; i++) {
+                        vis[i] = true
+                    }
+                    try {
+                        window.electron.tasToolSetVisibility(vis)
+                    } catch (e) {}
+                };
+                if (hd) hd.onclick = function() {
+                    for (var i = 0; i < vis.length; i++) {
+                        if (i !== sel) vis[i] = false
+                    }
+                    try {
+                        window.electron.tasToolSetVisibility(vis)
+                    } catch (e) {}
+                };
+            } catch (e) {}
+        }
+
+        window.addEventListener("DOMContentLoaded", function() {
+            setVal(window.__tasEncoded || "");
+            setHuman(window.__tasDecoded || "");
+            window.electron.onTasToolGhostsUpdate(function(payload) {
+                try {
+                    renderGhosts(payload)
+                } catch (e) {}
+            });
+            if (window.__tasGhosts) {
+                try {
+                    renderGhosts(window.__tasGhosts)
+                } catch (e) {}
+            }
+
+            $("copy").onclick = function() {
+                var t = $("decoded").value;
+                if (window.navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(t).catch(function() {});
+                } else {
+                    try {
+                        var temp = document.createElement('textarea');
+                        temp.value = t;
+                        document.body.appendChild(temp);
+                        temp.select();
+                        document.execCommand("copy");
+                        document.body.removeChild(temp);
+                    } catch (e) {}
+                }
+            };
+            $("clear").onclick = function() {
+                setVal("");
+                setHuman("");
+            };
+            $("apply").onclick = function() {
+                try {
+                    var ta = $("decoded");
+                    var fullText = ta.value || "";
+                    var lines = fullText.split("\n");
+                    var commands = [];
+                    var baseLines = [];
+
+                    function hasGeneratedBlock(linesArr, idx, cmd) {
+                        var begin = '# BEGIN generated: ' + cmd;
+                        var end = '# END generated: ' + cmd;
+                        if (linesArr[idx + 1] && linesArr[idx + 1].trim() === begin) {
+                            for (var k = idx + 2; k < linesArr.length; k++) {
+                                if ((linesArr[k] || '').trim() === end) return true;
+                            }
+                        }
+                        return false;
+                    }
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i];
+                        var hashIdx = line.indexOf('#');
+                        var codePart = (hashIdx >= 0 ? line.slice(0, hashIdx) : line).trim();
+                        if (/^(tap|hold)\s+/i.test(codePart)) {
+                            var skip = hasGeneratedBlock(lines, i, codePart);
+                            if (!skip) commands.push({
+                                lineIndex: i,
+                                text: codePart
+                            });
+                        } else if (codePart.length) {
+                            baseLines.push(codePart);
+                        }
+                    }
+
+                    function toEntries(map) {
+                        return Array.from(map.entries()).map(function(e) {
+                            return {
+                                frame: e[0],
+                                keys: e[1]
+                            };
+                        }).sort(function(a, b) {
+                            return a.frame - b.frame;
+                        });
+                    }
+
+                    function normalizeKeys(str) {
+                        var order = ["w", "a", "s", "d", "r"];
+                        var set = new Set();
+                        for (var k of String(str || ""))
+                            if (order.indexOf(k) >= 0) set.add(k);
+                        return order.filter(function(k) {
+                            return set.has(k);
+                        }).join("");
+                    }
+
+                    function parseLines(text) {
+                        return (text || "").split("\n").map(function(line) {
+                                var idx = line.indexOf("#");
+                                return idx >= 0 ? line.slice(0, idx) : line;
+                            })
+                            .filter(function(line) {
+                                return line.trim() !== "";
+                            })
+                            .map(function(line) {
+                                var parts = line.split(",");
+                                var frame = parseInt(parts[0], 10);
+                                var keys = (parts.slice(1).join(",") || "").trim();
+                                return {
+                                    frame: frame,
+                                    keys: normalizeKeys(keys)
+                                };
+                            })
+                            .filter(function(e) {
+                                return !isNaN(e.frame);
+                            })
+                            .sort(function(a, b) {
+                                return a.frame - b.frame;
+                            });
+                    }
+
+                    function getStateAt(entries, frame) {
+                        var state = "";
+                        for (var i = 0; i < entries.length; i++) {
+                            if (entries[i].frame <= frame) state = entries[i].keys;
+                            else break;
+                        }
+                        return state;
+                    }
+
+                    // Start with base map from non-command lines
+                    var baseEntries = parseLines(baseLines.join("\n"));
+                    var out = new Map(baseEntries.map(function(e) {
+                        return [e.frame, e.keys];
+                    }));
+
+                    // Apply each command sequentially against the evolving map
+                    for (var ci = 0; ci < commands.length; ci++) {
+                        var cmdText = commands[ci].text;
+                        if (/^hold\s+/i.test(cmdText)) {
+                            var m = cmdText.match(/^hold\s+([wasd]+)\s+for\s+(\d+)\s+at\s+(\d+)$/i) || cmdText.match(/^hold\s+([wasd]+)\s+(\d+)\s+(\d+)$/i);
+                            if (!m) continue;
+                            var held = normalizeKeys(m[1]);
+                            var dur = parseInt(m[2], 10);
+                            var start = parseInt(m[3], 10);
+                            if (!held || isNaN(dur) || isNaN(start) || dur <= 0) continue;
+                            var end = start + dur;
+                            var snapshot = toEntries(out);
+                            var startBase = getStateAt(snapshot, start);
+                            var startSet = new Set((startBase || "").split(""));
+                            for (var ch of held) startSet.add(ch);
+                            out.set(start, normalizeKeys(Array.from(startSet).join("")));
+                            for (var ei = 0; ei < snapshot.length; ei++) {
+                                var e = snapshot[ei];
+                                if (e.frame > start && e.frame < end) {
+                                    var mid = new Set((e.keys || "").split(""));
+                                    for (var ch2 of held) mid.add(ch2);
+                                    out.set(e.frame, normalizeKeys(Array.from(mid).join("")));
+                                }
+                            }
+                            var endBase = getStateAt(snapshot, end);
+                            out.set(end, normalizeKeys(endBase));
+                        } else if (/^tap\s+/i.test(cmdText)) {
+                            var parts = cmdText.split(/\s+/);
+                            if (parts.length !== 6) continue;
+                            var arr = parts.map(function(t, i) {
+                                return (i > 0 && i !== 3) ? parseInt(t, 10) : t;
+                            });
+                            var r = arr[1],
+                                a2 = arr[2],
+                                o = arr[3],
+                                s = arr[4],
+                                i2 = arr[5];
+                            if ([r, a2, s, i2].some(isNaN) || r >= a2 || s <= 0 || i2 <= 0) continue;
+                            var snapshot = toEntries(out);
+                            var lastKeys = "";
+                            var lastFrame = -1;
+                            for (var u = 0; u < snapshot.length; u++) {
+                                var e = snapshot[u];
+                                if (e.frame < r && e.frame > lastFrame) {
+                                    lastKeys = e.keys;
+                                    lastFrame = e.frame;
+                                }
+                            }
+                            var p = r;
+                            var seq = [];
+                            while (p <= a2) {
+                                seq.push([p, String(o)]);
+                                p += s;
+                                if (p > a2) break;
+                                seq.push([p, String(lastKeys)]);
+                                p += i2;
+                            }
+                            for (var q = 0; q < seq.length; q++) {
+                                out.set(seq[q][0], normalizeKeys(seq[q][1]));
+                            }
+                        }
+                    }
+
+                    var finalText = Array.from(out.entries()).sort(function(a, b) {
+                        return a[0] - b[0];
+                    }).map(function(kv) {
+                        return kv[0] + "," + kv[1];
+                    }).join("\n");
+                    window.electron.tasToolApply(finalText);
+                } catch (e) {
+                    try {
+                        var t = $("decoded").value || "";
+                        window.electron.tasToolApply(t);
+                    } catch (e2) {}
+                }
+            };
+
+            // Scroll helpers for decoded editor
+            try {
+                var scrollUpBtn = $("decoded-scroll-up");
+                var scrollDownBtn = $("decoded-scroll-down");
+                var decoded = $("decoded");
+                if (scrollUpBtn && scrollDownBtn && decoded) {
+                    scrollUpBtn.addEventListener('click', function() {
+                        try {
+                            decoded.scrollTo({
+                                top: 0,
+                                behavior: 'smooth'
+                            });
+                        } catch (e) {
+                            try {
+                                decoded.scrollTop = 0;
+                            } catch (_) {}
+                        }
+                    });
+                    scrollDownBtn.addEventListener('click', function() {
+                        try {
+                            decoded.scrollTo({
+                                top: decoded.scrollHeight,
+                                behavior: 'smooth'
+                            });
+                        } catch (e) {
+                            try {
+                                decoded.scrollTop = decoded.scrollHeight;
+                            } catch (_) {}
+                        }
+                    });
+                }
+            } catch (e) {}
+
+            // Save/Load
+            $("save-file").onclick = async function() {
+                try {
+                    var t = $("decoded").value || "";
+                    await window.electron.tasToolSaveToFile(t);
+                } catch (e) {}
+            };
+            $("load-file").onclick = async function() {
+                try {
+                    var res = await window.electron.tasToolLoadFromFile();
+                    if (res && !res.canceled && typeof res.content === "string") {
+                        setHuman(res.content);
+                    }
+                } catch (e) {}
+            };
+
+            // ---- Command execution (shared by button and palette) ----
+            const keyOrder = ["w", "a", "s", "d"];
+
+            function normalizeKeys(str) {
+                if (!str) return "";
+                const set = new Set();
+                for (const ch of String(str)) {
+                    if (keyOrder.includes(ch)) set.add(ch);
+                }
+                return keyOrder.filter(k => set.has(k)).join("");
+            }
+
+            function parseLines(text) {
+                return (text || "").split("\n").map(line => {
+                    const idx = line.indexOf("#");
+                    return idx >= 0 ? line.slice(0, idx) : line;
+                }).filter(line => line.trim() !== "").map(line => {
+                    const parts = line.split(",");
+                    const frame = parseInt(parts[0], 10);
+                    const keys = (parts.slice(1).join(",") || "").trim();
+                    return {
+                        frame,
+                        keys: normalizeKeys(keys)
+                    };
+                }).filter(e => !isNaN(e.frame)).sort((a, b) => a.frame - b.frame);
+            }
+
+            function getStateAt(entries, frame) {
+                let state = "";
+                for (let i = 0; i < entries.length; i++) {
+                    if (entries[i].frame <= frame) state = entries[i].keys;
+                    else break;
+                }
+                return state;
+            }
+
+            function executeTasCommand(t) {
+                if (!t || !(t = String(t).trim())) return false;
+                // HOLD
+                if (t.startsWith("hold")) {
+                    let m = t.match(/^hold\s+([wasd]+)\s+for\s+(\d+)\s+at\s+(\d+)$/i);
+                    if (!m) m = t.match(/^hold\s+([wasd]+)\s+(\d+)\s+(\d+)$/i);
+                    if (!m) return false;
+                    const heldKeys = normalizeKeys(m[1]);
+                    const duration = parseInt(m[2], 10);
+                    const start = parseInt(m[3], 10);
+                    if (!heldKeys || isNaN(duration) || isNaN(start) || duration <= 0) return false;
+                    const end = start + duration;
+                    const existingText = $("decoded").value || "";
+                    const entries = parseLines(existingText);
+                    const baseMap = new Map(entries.map(e => [e.frame, e.keys]));
+                    const updates = new Map();
+                    const startBase = getStateAt(entries, start);
+                    const startSet = new Set([...(startBase || "")]);
+                    for (const k of heldKeys) startSet.add(k);
+                    const startState = normalizeKeys(Array.from(startSet).join(""));
+                    updates.set(start, startState);
+                    for (const e of entries) {
+                        if (e.frame > start && e.frame < end) {
+                            const midSet = new Set([...(e.keys || "")]);
+                            for (const k of heldKeys) midSet.add(k);
+                            updates.set(e.frame, normalizeKeys(Array.from(midSet).join("")));
+                        }
+                    }
+                    const endBase = getStateAt(entries, end);
+                    updates.set(end, normalizeKeys(endBase));
+                    const out = new Map(baseMap);
+                    for (const [fr, ks] of updates.entries()) out.set(fr, ks);
+                    const result = Array.from(out.entries()).sort((a, b) => a[0] - b[0]).map(([fr, ks]) => `${fr},${ks}`);
+                    setHuman(result.join("\n"));
+                    return true;
+                }
+                // TAP
+                if (t.startsWith("tap ")) {
+                    const e = t.split(/\s+/);
+                    if (6 !== e.length) return false;
+                    const n = e.map((t, e) => e > 0 && e !== 3 ? parseInt(t, 10) : t),
+                        r = n[1],
+                        a = n[2],
+                        o = n[3],
+                        s = n[4],
+                        i = n[5];
+                    if ([r, a, s, i].some(isNaN) || r >= a || s <= 0 || i <= 0) return false;
+                    const l = $("decoded").value.split("\n").filter(t => "" !== t.trim());
+                    let c = "";
+                    let d = -1;
+                    for (const u of l) {
+                        const t = u.split(",");
+                        if (2 === t.length) {
+                            const e = parseInt(t[0], 10);
+                            !isNaN(e) && e < r && e > d && (c = t[1].trim(), d = e);
+                        }
+                    }
+                    const f = [];
+                    let p = r;
+                    for (; p <= a;) {
+                        f.push(`${p},${o}`);
+                        p += s;
+                        if (p > a) break;
+                        f.push(`${p},${c}`);
+                        p += i;
+                    }
+                    const m = new Map;
+                    l.forEach(t => {
+                        const e = t.split(","),
+                            n = parseInt(e[0], 10);
+                        isNaN(n) || m.set(n, e[1] ? e[1].trim() : "")
+                    });
+                    f.forEach(t => {
+                        const e = t.split(","),
+                            n = parseInt(e[0], 10);
+                        isNaN(n) || m.set(n, e[1] ? e[1].trim() : "")
+                    });
+                    const g = Array.from(m.entries()).sort((t, e) => t[0] - e[0]).map(([t, e]) => `${t},${e}`);
+                    setHuman(g.join("\n"));
+                    return true;
+                }
+                // SHIFT
+                if (/^shift\s+/i.test(t)) {
+                    let m = t.match(/^shift\s+(-?\d+)\s+from\s+(-?\d+)\s+to\s+(-?\d+)$/i);
+                    let hasEnd = true;
+                    if (!m) {
+                        m = t.match(/^shift\s+(-?\d+)\s+from\s+(-?\d+)$/i);
+                        hasEnd = false;
+                    }
+                    if (!m) return false;
+                    const delta = parseInt(m[1], 10);
+                    let start = parseInt(m[2], 10);
+                    let end = hasEnd ? parseInt(m[3], 10) : null;
+                    if (isNaN(delta) || isNaN(start) || (hasEnd && isNaN(end))) return false;
+                    if (start < 0) start = 0;
+                    if (hasEnd && end < 0) end = 0;
+                    const ta = $("decoded");
+                    if (!ta) return false;
+                    const txt = ta.value || "";
+                    const lines = txt.split("\n");
+                    const out = lines.map(function(line) {
+                        const mm = line.match(/^(\s*)(\d+)(\s*,[\s\S]*)$/);
+                        if (!mm) return line;
+                        const fr = parseInt(mm[2], 10);
+                        if (isNaN(fr)) return line;
+                        if (hasEnd) {
+                            if (fr < start || fr > end) return line;
+                        } else {
+                            if (fr < start) return line;
+                        }
+                        let nf = fr + delta;
+                        if (nf < 0) nf = 0;
+                        return mm[1] + String(nf) + mm[3];
+                    });
+                    setHuman(out.join("\n"));
+                    return true;
+                }
+                return false;
+            }
+            $("execute").onclick = function() {
+                const t = $("command").value;
+                executeTasCommand(t);
+            };
+
+            var decodedTa = $("decoded"),
+                lastSel = {
+                    start: 0,
+                    end: 0
+                };
+            if (decodedTa) {
+                function updateLastSel() {
+                    try {
+                        lastSel.start = decodedTa.selectionStart || 0;
+                        lastSel.end = decodedTa.selectionEnd || 0;
+                    } catch (e) {}
+                }
+                decodedTa.addEventListener('select', updateLastSel);
+                decodedTa.addEventListener('keyup', updateLastSel);
+                decodedTa.addEventListener('mouseup', updateLastSel);
+                decodedTa.addEventListener('blur', updateLastSel);
+            }
+
+            document.getElementById("offset-apply").onclick = function() {
+                const t = $("decoded");
+                const e = $("offset-ms");
+                if (!t || !e) return;
+                const n = parseInt(e.value, 10);
+                if (isNaN(n) || n === 0) return;
+                let o = typeof t.selectionStart === 'number' ? t.selectionStart : lastSel.start;
+                let a = typeof t.selectionEnd === 'number' ? t.selectionEnd : lastSel.end;
+                if (o === a) return;
+                const l = t.value;
+
+                let s = l.lastIndexOf("\n", o - 1) + 1,
+                    i = l.indexOf("\n", a);
+                if (i === -1) i = l.length;
+                const r = l.substring(0, s),
+                    c = l.substring(i),
+                    u = l.substring(s, i);
+                const d = u.split("\n").map(t => {
+                    if (t.trim() === "") return t;
+                    const e = t.split(",");
+                    if (e.length < 2) return t;
+                    const o = parseInt(e[0], 10);
+                    if (isNaN(o)) return t;
+                    let a = o + n;
+                    if (a < 0) a = 0;
+                    const l = e.slice(1).join(",");
+                    return `${a},${l}`;
+                }).join("\n");
+
+                setHuman(r + d + c);
+                e.value = "";
+                lastSel = {
+                    start: 0,
+                    end: 0
+                };
+            };
+
+            (function() {
+                var fb = $("findbar"),
+                    f = $("find"),
+                    cnt = $("find-count"),
+                    ta = $("decoded");
+                var state = {
+                    idx: -1,
+                    pos: []
+                };
+
+                function updateCount() {
+                    if (!state.pos.length) {
+                        cnt.textContent = "0 of 0";
+                    } else {
+                        cnt.textContent = (state.idx + 1) + " of " + state.pos.length;
+                    }
+                }
+
+                function select(k) {
+                    if (k < 0 || k >= state.pos.length) {
+                        if (!state.pos.length) updateCount();
+                        return;
+                    }
+                    state.idx = k;
+                    var start = state.pos[k];
+                    var len = (f.value || "").length;
+                    var hadFindFocus = document.activeElement === f;
+                    ta.focus();
+                    try {
+                        ta.setSelectionRange(start, start + len);
+                    } catch (e) {}
+                    try {
+                        var textBefore = ta.value.substring(0, start);
+                        var lineNumber = textBefore.split('\n').length;
+                        var style = window.getComputedStyle(ta);
+                        var lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) * 1.2) || 15;
+                        var scrollTop = (lineNumber - 1) * lineHeight;
+                        ta.scrollTop = scrollTop - (ta.clientHeight / 2) + (lineHeight / 2);
+                    } catch (e) {}
+                    if (hadFindFocus) {
+                        try {
+                            f.focus();
+                        } catch (e) {}
+                    }
+                    updateCount();
+                }
+
+                function refresh() {
+                    if (!fb || fb.style.display === "none") return;
+                    var term = f.value || "";
+                    var txt = ta.value || "";
+                    var hay = txt.toLowerCase();
+                    var needle = term.toLowerCase();
+                    var lastKnownPosition = typeof ta.selectionStart === 'number' ? ta.selectionStart : 0;
+                    state.pos = [];
+                    state.idx = -1;
+                    if (!needle) {
+                        updateCount();
+                        return;
+                    }
+                    var p = 0;
+                    while (true) {
+                        var i = hay.indexOf(needle, p);
+                        if (i === -1) break;
+                        state.pos.push(i);
+                        p = i + needle.length;
+                    }
+                    if (state.pos.length) {
+                        var nextIdx = state.pos.findIndex(function(p) {
+                            return p >= lastKnownPosition;
+                        });
+                        select(nextIdx !== -1 ? nextIdx : 0);
+                    } else {
+                        updateCount();
+                    }
+                }
+
+                function next() {
+                    if (!state.pos.length) return;
+                    var newIdx = (state.idx + 1) % state.pos.length;
+                    select(newIdx);
+                }
+
+                function prev() {
+                    if (!state.pos.length) return;
+                    var newIdx = (state.idx - 1 + state.pos.length) % state.pos.length;
+                    select(newIdx);
+                }
+
+                if (fb && f && cnt && ta) {
+                    $("find-next").onclick = function() {
+                        next();
+                    };
+                    $("find-prev").onclick = function() {
+                        prev();
+                    };
+                    $("find-close").onclick = function() {
+                        fb.style.display = "none";
+                    };
+                    f.addEventListener("input", function() {
+                        refresh();
+                    });
+                    f.addEventListener("keydown", function(e) {
+                        if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.shiftKey ? prev() : next();
+                        }
+                    });
+
+                    window.addEventListener("keydown", function(e) {
+                        if ((e.ctrlKey || e.metaKey) && (e.key === "f" || e.code === "KeyF")) {
+                            e.preventDefault();
+                            fb.style.display = "flex";
+                            f.focus();
+                            try {
+                                f.select();
+                            } catch (e) {}
+                            refresh();
+                        } else if (e.key === "Escape" && fb.style.display !== "none") {
+                            e.preventDefault();
+                            fb.style.display = "none";
+                        } else if (e.key === "F3" && fb.style.display !== "none") {
+                            e.preventDefault();
+                            e.shiftKey ? prev() : next();
+                        }
+                    });
+
+                    var _setHuman = setHuman;
+                    setHuman = function(v) {
+                        _setHuman(v);
+                        try {
+                            if (fb.style.display !== "none") refresh();
+                        } catch (e) {}
+                    };
+                }
+            })();
+
+            // ---- Command expand/collapse overlay for decoded textarea ----
+            (function() {
+                var ta = $("decoded");
+                var ov = $("decoded-overlay");
+                if (!ta || !ov) return;
+
+                var scheduled = false;
+                var measureCanvas = document.createElement('canvas');
+                var measureCtx = measureCanvas.getContext('2d');
+
+                function normalizeKeys(str) {
+                    var order = ["w", "a", "s", "d"];
+                    var set = new Set();
+                    for (var k of String(str || ""))
+                        if (order.indexOf(k) >= 0) set.add(k);
+                    return order.filter(function(k) {
+                        return set.has(k);
+                    }).join("");
+                }
+
+                function parseLines(text) {
+                    return (text || "").split("\n").map(function(line) {
+                            var idx = line.indexOf("#");
+                            return idx >= 0 ? line.slice(0, idx) : line;
+                        })
+                        .filter(function(line) {
+                            return line.trim() !== "";
+                        })
+                        .map(function(line) {
+                            var parts = line.split(",");
+                            var frame = parseInt(parts[0], 10);
+                            var keys = (parts.slice(1).join(",") || "").trim();
+                            return {
+                                frame: frame,
+                                keys: normalizeKeys(keys)
+                            };
+                        })
+                        .filter(function(e) {
+                            return !isNaN(e.frame);
+                        })
+                        .sort(function(a, b) {
+                            return a.frame - b.frame;
+                        });
+                }
+
+                function getStateAt(entries, frame) {
+                    var state = "";
+                    for (var i = 0; i < entries.length; i++) {
+                        if (entries[i].frame <= frame) state = entries[i].keys;
+                        else break;
+                    }
+                    return state;
+                }
+
+                function toEntries(map) {
+                    return Array.from(map.entries()).map(function(e) {
+                        return {
+                            frame: e[0],
+                            keys: e[1]
+                        };
+                    }).sort(function(a, b) {
+                        return a.frame - b.frame;
+                    });
+                }
+
+                function getBaseAndCommands() {
+                    var text = ta.value || "";
+                    var lines = text.split("\n");
+                    var commands = [];
+                    var base = [];
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i];
+                        var hashIdx = line.indexOf('#');
+                        var codePart = (hashIdx >= 0 ? line.slice(0, hashIdx) : line).trim();
+                        if (/^(tap|hold)\s+/i.test(codePart)) {
+                            commands.push({
+                                lineIndex: i,
+                                text: codePart,
+                                fullLine: line
+                            });
+                        } else if (codePart.length) {
+                            base.push(codePart);
+                        }
+                    }
+                    return {
+                        base: parseLines(base.join("\n")),
+                        commands: commands
+                    };
+                }
+
+                function findGeneratedRange(lines, idx, cmd) {
+                    var begin = '# BEGIN generated: ' + cmd;
+                    var end = '# END generated: ' + cmd;
+                    if (lines[idx + 1] && lines[idx + 1].trim() === begin) {
+                        for (var k = idx + 2; k < lines.length; k++) {
+                            if ((lines[k] || '').trim() === end) {
+                                return {
+                                    from: idx + 1,
+                                    to: k
+                                };
+                            }
+                        }
+                    }
+                    return null;
+                }
+
+                function applyHold(out, cmd) {
+                    var m = cmd.match(/^hold\s+([wasd]+)\s+for\s+(\d+)\s+at\s+(\d+)$/i) || cmd.match(/^hold\s+([wasd]+)\s+(\d+)\s+(\d+)$/i);
+                    if (!m) return [];
+                    var held = normalizeKeys(m[1]);
+                    var dur = parseInt(m[2], 10);
+                    var start = parseInt(m[3], 10);
+                    if (!held || isNaN(dur) || isNaN(start) || dur <= 0) return [];
+                    var end = start + dur;
+                    var before = new Map(out);
+                    var snapshot = toEntries(out);
+                    var startBase = getStateAt(snapshot, start);
+                    var startSet = new Set((startBase || "").split(""));
+                    for (var ch of held) startSet.add(ch);
+                    out.set(start, normalizeKeys(Array.from(startSet).join("")));
+                    for (var i = 0; i < snapshot.length; i++) {
+                        var e = snapshot[i];
+                        if (e.frame > start && e.frame < end) {
+                            var mid = new Set((e.keys || "").split(""));
+                            for (var ch2 of held) mid.add(ch2);
+                            out.set(e.frame, normalizeKeys(Array.from(mid).join("")));
+                        }
+                    }
+                    var endBase = getStateAt(snapshot, end);
+                    out.set(end, normalizeKeys(endBase));
+                    // diff
+                    var diff = [];
+                    out.forEach(function(val, key) {
+                        var prev = before.get(key);
+                        if (prev !== val) diff.push([key, val]);
+                    });
+                    return diff.sort(function(a, b) {
+                        return a[0] - b[0];
+                    });
+                }
+
+                function applyTap(out, cmd) {
+                    var parts = cmd.split(/\s+/);
+                    if (parts.length !== 6) return [];
+                    var arr = parts.map(function(t, i) {
+                        return (i > 0 && i !== 3) ? parseInt(t, 10) : t;
+                    });
+                    var r = arr[1],
+                        a2 = arr[2],
+                        o = arr[3],
+                        s = arr[4],
+                        i2 = arr[5];
+                    if ([r, a2, s, i2].some(isNaN) || r >= a2 || s <= 0 || i2 <= 0) return [];
+                    var before = new Map(out);
+                    var snapshot = toEntries(out);
+                    var lastKeys = "";
+                    var lastFrame = -1;
+                    for (var u = 0; u < snapshot.length; u++) {
+                        var e = snapshot[u];
+                        if (e.frame < r && e.frame > lastFrame) {
+                            lastKeys = e.keys;
+                            lastFrame = e.frame;
+                        }
+                    }
+                    var p = r;
+                    while (p <= a2) {
+                        out.set(p, normalizeKeys(String(o)));
+                        p += s;
+                        if (p > a2) break;
+                        out.set(p, normalizeKeys(String(lastKeys)));
+                        p += i2;
+                    }
+                    var diff = [];
+                    out.forEach(function(val, key) {
+                        var prev = before.get(key);
+                        if (prev !== val) diff.push([key, val]);
+                    });
+                    return diff.sort(function(a, b) {
+                        return a[0] - b[0];
+                    });
+                }
+
+                function computeDeltas() {
+                    var bc = getBaseAndCommands();
+                    var out = new Map(bc.base.map(function(e) {
+                        return [e.frame, e.keys];
+                    }));
+                    var deltas = new Map(); // lineIndex -> [ [frame,keys], ... ]
+                    var ordered = bc.commands.slice().sort(function(a, b) {
+                        return a.lineIndex - b.lineIndex;
+                    });
+                    for (var k = 0; k < ordered.length; k++) {
+                        var c = ordered[k];
+                        var d;
+                        if (/^hold\s+/i.test(c.text)) d = applyHold(out, c.text);
+                        else if (/^tap\s+/i.test(c.text)) d = applyTap(out, c.text);
+                        else d = [];
+                        deltas.set(c.lineIndex, d);
+                    }
+                    return {
+                        deltas: deltas,
+                        commands: bc.commands
+                    };
+                }
+
+                function render() {
+                    try {
+                        // Size overlay to match textarea box
+                        var rect = ta.getBoundingClientRect();
+                        var parentRect = ov.parentElement.getBoundingClientRect();
+                        ov.style.left = (rect.left - parentRect.left) + 'px';
+                        ov.style.top = (rect.top - parentRect.top) + 'px';
+                        ov.style.width = rect.width + 'px';
+                        ov.style.height = rect.height + 'px';
+                    } catch (e) {}
+                    ov.textContent = '';
+
+                    var style = window.getComputedStyle(ta);
+                    var lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) * 1.2) || 15;
+                    var padTop = parseFloat(style.paddingTop) || 0;
+                    var padLeft = parseFloat(style.paddingLeft) || 0;
+                    var rightPad = parseFloat(style.paddingRight) || 0;
+                    var del = computeDeltas();
+                    var cmds = del.commands;
+                    var deltas = del.deltas;
+                    var clientH = ta.clientHeight;
+                    var text = ta.value || '';
+                    var lines = text.split('\n');
+                    // font for measuring
+                    var fontStr = style.font || (style.fontWeight + ' ' + style.fontSize + ' ' + style.fontFamily);
+                    try {
+                        measureCtx.font = fontStr;
+                    } catch (e) {}
+
+                    for (var i = 0; i < cmds.length; i++) {
+                        var c = cmds[i];
+                        var topPx = padTop + c.lineIndex * lineHeight - ta.scrollTop;
+                        if (topPx < -lineHeight || topPx > clientH) continue;
+                        var rng = findGeneratedRange(lines, c.lineIndex, c.text);
+                        var isOpen = !!rng;
+                        // If the command text no longer matches strict pattern, don't show arrow
+                        if (!/^((tap\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+)|(hold\s+[wasd]+\s+(for\s+\d+\s+at\s+\d+|\d+\s+\d+)))$/i.test(c.text)) {
+                            continue;
+                        }
+                        var btn = document.createElement('button');
+                        btn.className = 'tas-cmd-arrow';
+                        btn.textContent = isOpen ? '▾' : '▸';
+                        var lineText = lines[c.lineIndex] || '';
+                        var w = 0;
+                        try {
+                            w = measureCtx.measureText(lineText).width || 0;
+                        } catch (e) {
+                            w = (lineText.length * (parseFloat(style.fontSize) || 12) * 0.6);
+                        }
+                        var maxLeft = ta.clientWidth - rightPad - 18;
+                        var leftPx = Math.min(padLeft + w + 6, maxLeft);
+                        btn.style.left = Math.round(leftPx) + 'px';
+                        btn.style.top = Math.round(topPx + (lineHeight - 16) / 2) + 'px';
+                        btn.title = (isOpen ? 'Hide' : 'Show') + ' generated inputs';
+                        (function(cmdObj) {
+                            btn.addEventListener('click', function(ev) {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                var curText = ta.value || '';
+                                var curLines = curText.split('\n');
+                                var existing = findGeneratedRange(curLines, cmdObj.lineIndex, cmdObj.text);
+                                if (existing) {
+                                    // collapse: remove block
+                                    var before = curLines.slice(0, existing.from);
+                                    var after = curLines.slice(existing.to + 1);
+                                    var newLines = before.concat(after);
+                                    setHuman(newLines.join('\n'));
+                                    schedule();
+                                } else {
+                                    // expand: insert generated inputs with markers
+                                    var entries = deltas.get(cmdObj.lineIndex) || [];
+                                    var ins = ['# BEGIN generated: ' + cmdObj.text];
+                                    for (var ii = 0; ii < entries.length; ii++) {
+                                        ins.push(entries[ii][0] + ',' + entries[ii][1]);
+                                    }
+                                    ins.push('# END generated: ' + cmdObj.text);
+                                    var head = curLines.slice(0, cmdObj.lineIndex + 1);
+                                    var tail = curLines.slice(cmdObj.lineIndex + 1);
+                                    var newLines = head.concat(ins).concat(tail);
+                                    setHuman(newLines.join('\n'));
+                                    schedule();
+                                }
+                            });
+                        })(c);
+                        ov.appendChild(btn);
+                    }
+                }
+
+                function schedule() {
+                    if (scheduled) return;
+                    scheduled = true;
+                    requestAnimationFrame(function() {
+                        scheduled = false;
+                        render();
+                    });
+                }
+
+                ta.addEventListener('input', function() {
+                    schedule();
+                });
+                ta.addEventListener('scroll', function() {
+                    schedule();
+                });
+                window.addEventListener('resize', function() {
+                    schedule();
+                });
+                // Re-render after setHuman programmatic updates
+                try {
+                    var __prevSetHuman = setHuman;
+                    setHuman = function(v) {
+                        __prevSetHuman(v);
+                        try {
+                            schedule();
+                        } catch (e) {}
+                    };
+                } catch (e) {}
+
+                // Initial
+                schedule();
+            })();
+
+            // ---- Command Palette ----
+            (function() {
+                var overlay = $("palette-overlay"),
+                    input = $("palette-input"),
+                    list = $("palette-list");
+                if (!overlay || !input || !list) return;
+
+                function extractLabels() {
+                    try {
+                        var lines = ($("decoded").value || "").split("\n");
+                        var labels = [];
+                        var offset = 0;
+                        for (var i = 0; i < lines.length; i++) {
+                            var line = lines[i];
+                            var idx = line.indexOf('#');
+                            if (idx >= 0) {
+                                var lab = line.slice(idx + 1).trim();
+                                if (lab) labels.push({
+                                    label: lab,
+                                    lineIndex: i,
+                                    offset: offset
+                                });
+                            }
+                            offset += line.length + 1;
+                        }
+                        return labels;
+                    } catch (e) {
+                        return [];
+                    }
+                }
+
+                function selectInTextarea(start, len) {
+                    try {
+                        var ta = $("decoded");
+                        ta.focus();
+                        ta.setSelectionRange(start, start + len);
+                        var textBefore = ta.value.substring(0, start);
+                        var lineNumber = textBefore.split('\n').length;
+                        var style = window.getComputedStyle(ta);
+                        var lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) * 1.2) || 15;
+                        var scrollTop = (lineNumber - 1) * lineHeight;
+                        ta.scrollTop = scrollTop - (ta.clientHeight / 2) + (lineHeight / 2);
+                    } catch (e) {}
+                }
+
+                function gotoFrame(n) {
+                    var txt = $("decoded").value || "";
+                    var lines = txt.split("\n");
+                    var offset = 0;
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i];
+                        var fc = line.split(',')[0].trim();
+                        var fr = parseInt(fc, 10);
+                        if (!isNaN(fr) && fr === n) {
+                            selectInTextarea(offset, 0);
+                            return true;
+                        }
+                        offset += line.length + 1;
+                    }
+                    return false;
+                }
+
+                function computeItems(q) {
+                    var items = [];
+                    var query = String(q || "").trim();
+                    var labels = extractLabels();
+                    // Run typed hold/tap
+                    if (/^(tap|hold|shift)\s+/i.test(query)) {
+                        items.push({
+                            title: 'Run command',
+                            sub: query,
+                            action: function() {
+                                executeTasCommand(query);
+                                close();
+                            }
+                        });
+                    }
+                    // Frame
+                    if (/^\d+$/.test(query)) {
+                        var n = parseInt(query, 10);
+                        items.push({
+                            title: 'Go to frame ' + n,
+                            sub: 'Selects the line starting with ' + n,
+                            action: function() {
+                                gotoFrame(n);
+                                close();
+                            }
+                        });
+                    }
+                    // Labels
+                    if (query) {
+                        var matches = labels.filter(function(l) {
+                            return l.label.toLowerCase().includes(query.toLowerCase());
+                        }).slice(0, 10);
+                        matches.forEach(function(l) {
+                            items.push({
+                                title: 'Go to label',
+                                sub: l.label,
+                                action: function() {
+                                    selectInTextarea(l.offset, 0);
+                                    close();
+                                }
+                            });
+                        });
+                    } else {
+                        labels.slice(0, 5).forEach(function(l) {
+                            items.push({
+                                title: 'Go to label',
+                                sub: l.label,
+                                action: function() {
+                                    selectInTextarea(l.offset, 0);
+                                    close();
+                                }
+                            });
+                        });
+                    }
+                    // Common actions
+                    items.push({
+                        title: 'Apply',
+                        sub: 'Encode and send to game',
+                        action: function() {
+                            try {
+                                $("apply").click();
+                            } catch (e) {}
+                            close();
+                        }
+                    });
+                    items.push({
+                        title: 'Copy',
+                        sub: 'Copy decoded to clipboard',
+                        action: function() {
+                            try {
+                                $("copy").click();
+                            } catch (e) {}
+                            close();
+                        }
+                    });
+                    items.push({
+                        title: 'Clear',
+                        sub: 'Clear decoded and encoded',
+                        action: function() {
+                            try {
+                                $("clear").click();
+                            } catch (e) {}
+                            close();
+                        }
+                    });
+                    items.push({
+                        title: 'Save to File',
+                        sub: 'Write decoded script to .tas',
+                        action: function() {
+                            try {
+                                $("save-file").click();
+                            } catch (e) {}
+                            close();
+                        }
+                    });
+                    items.push({
+                        title: 'Load from File',
+                        sub: 'Load decoded script from file',
+                        action: function() {
+                            try {
+                                $("load-file").click();
+                            } catch (e) {}
+                            close();
+                        }
+                    });
+                    return items;
+                }
+
+                var state = {
+                    items: [],
+                    idx: 0
+                };
+
+                function render() {
+                    list.textContent = '';
+                    state.items.forEach(function(it, i) {
+                        var div = document.createElement('div');
+                        div.className = 'palette-item' + (i === state.idx ? ' active' : '');
+                        var t = document.createElement('div');
+                        t.className = 'palette-title';
+                        t.textContent = it.title;
+                        var s = document.createElement('div');
+                        s.className = 'palette-sub';
+                        s.textContent = it.sub || '';
+                        div.appendChild(t);
+                        div.appendChild(s);
+                        div.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            state.idx = i;
+                            render();
+                        });
+                        div.addEventListener('dblclick', function() {
+                            try {
+                                state.items[i].action();
+                            } catch (e) {}
+                        });
+                        list.appendChild(div);
+                    });
+                }
+
+                function open() {
+                    overlay.style.display = 'flex';
+                    input.value = '';
+                    state.items = computeItems('');
+                    state.idx = 0;
+                    render();
+                    setTimeout(function() {
+                        try {
+                            input.focus();
+                        } catch (e) {}
+                    }, 0);
+                }
+
+                function close() {
+                    overlay.style.display = 'none';
+                }
+
+                input.addEventListener('input', function() {
+                    state.items = computeItems(input.value);
+                    state.idx = 0;
+                    render();
+                });
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (state.items.length) {
+                            state.idx = (state.idx + 1) % state.items.length;
+                            render();
+                        }
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (state.items.length) {
+                            state.idx = (state.idx - 1 + state.items.length) % state.items.length;
+                            render();
+                        }
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (state.items[state.idx]) try {
+                            state.items[state.idx].action();
+                        } catch (e) {}
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        close();
+                    }
+                });
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) close();
+                });
+
+                window.addEventListener('keydown', function(e) {
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+                        e.preventDefault();
+                        open();
+                    } else if (overlay.style.display !== 'none' && e.key === 'Escape') {
+                        e.preventDefault();
+                        close();
+                    }
+                }, true);
+            })();
+
+            // ---- Bookmarks (Labels) Overlay ----
+            (function() {
+                var overlay = $("bookmarks-overlay"),
+                    input = $("bookmarks-filter"),
+                    list = $("bookmarks-list");
+                var openBtn = $("bookmarks-open");
+                if (!overlay || !input || !list) return;
+
+                function extractLabels() {
+                    try {
+                        var text = $("decoded").value || "";
+                        var lines = text.split("\n");
+                        var labels = [];
+                        var offset = 0;
+                        for (var i = 0; i < lines.length; i++) {
+                            var line = lines[i];
+                            var hash = line.indexOf('#');
+                            if (hash >= 0) {
+                                var lab = line.slice(hash + 1).trim();
+                                if (lab) {
+                                    var comma = line.indexOf(',');
+                                    var frameStr = comma >= 0 ? line.slice(0, comma).trim() : '';
+                                    var frame = parseInt(frameStr, 10);
+                                    labels.push({
+                                        label: lab,
+                                        lineIndex: i,
+                                        offset: offset + hash,
+                                        lineOffset: offset,
+                                        frame: isNaN(frame) ? null : frame,
+                                        fullLine: line
+                                    });
+                                }
+                            }
+                            offset += line.length + 1;
+                        }
+                        return labels;
+                    } catch (e) {
+                        return [];
+                    }
+                }
+
+                function selectInTextarea(start, len) {
+                    try {
+                        var ta = $("decoded");
+                        ta.focus();
+                        ta.setSelectionRange(start, start + len);
+                        var textBefore = ta.value.substring(0, start);
+                        var lineNumber = textBefore.split('\n').length;
+                        var style = window.getComputedStyle(ta);
+                        var lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) * 1.2) || 15;
+                        var scrollTop = (lineNumber - 1) * lineHeight;
+                        ta.scrollTop = scrollTop - (ta.clientHeight / 2) + (lineHeight / 2);
+                    } catch (e) {}
+                }
+
+                function render(filter) {
+                    list.textContent = '';
+                    var labels = extractLabels();
+                    var q = String(filter || '').trim().toLowerCase();
+                    if (q) labels = labels.filter(function(l) {
+                        return l.label.toLowerCase().includes(q);
+                    });
+                    labels.forEach(function(l) {
+                        var div = document.createElement('div');
+                        div.className = 'palette-item';
+                        var t = document.createElement('div');
+                        t.className = 'palette-title';
+                        t.textContent = l.label;
+                        var s = document.createElement('div');
+                        s.className = 'palette-sub';
+                        s.textContent = (l.frame != null ? ('Frame ' + l.frame + ' — ') : '') + 'Line ' + (l.lineIndex + 1);
+                        div.appendChild(t);
+                        div.appendChild(s);
+                        div.addEventListener('dblclick', function() {
+                            try {
+                                selectInTextarea(l.lineOffset, 0);
+                                close();
+                            } catch (e) {}
+                        });
+                        div.addEventListener('click', function() {
+                            try {
+                                selectInTextarea(l.lineOffset, 0);
+                            } catch (e) {}
+                        });
+                        list.appendChild(div);
+                    });
+                }
+
+                function open() {
+                    overlay.style.display = 'flex';
+                    render('');
+                    setTimeout(function() {
+                        try {
+                            input.focus();
+                            input.select();
+                        } catch (e) {}
+                    }, 0);
+                }
+
+                function close() {
+                    overlay.style.display = 'none';
+                }
+
+                if (openBtn) openBtn.onclick = function() {
+                    open();
+                };
+                input.addEventListener('input', function() {
+                    render(input.value);
+                });
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) close();
+                });
+
+                function addLabelAtCaret() {
+                    try {
+                        var label = prompt('Label text');
+                        if (!label) return;
+                        var ta = $("decoded");
+                        var caret = typeof ta.selectionStart === 'number' ? ta.selectionStart : (window.lastSel && typeof lastSel.start === 'number' ? lastSel.start : 0);
+                        var txt = ta.value || '';
+                        var start = txt.lastIndexOf('\n', Math.max(0, caret - 1)) + 1;
+                        var end = txt.indexOf('\n', caret);
+                        if (end === -1) end = txt.length;
+                        var before = txt.substring(0, start);
+                        var after = txt.substring(end);
+                        var line = txt.substring(start, end);
+                        var hash = line.indexOf('#');
+                        var code = hash >= 0 ? line.slice(0, hash).replace(/\s+$/, '') : line.replace(/\s+$/, '');
+                        var newLine = code.length ? (code + ' # ' + label) : ('# ' + label);
+                        setHuman(before + newLine + after);
+                        try {
+                            selectInTextarea(start, 0);
+                        } catch (e) {}
+                        render(input.value);
+                    } catch (e) {}
+                }
+
+                function addLabelAtFrame() {
+                    try {
+                        var frameStr = prompt('Frame number');
+                        if (!frameStr) return;
+                        var fr = parseInt(frameStr, 10);
+                        if (isNaN(fr)) return;
+                        var label = prompt('Label text');
+                        if (!label) return;
+                        var ta = $("decoded");
+                        var txt = ta.value || '';
+                        var lines = txt.split('\n');
+                        var offset = 0;
+                        var found = false;
+                        for (var i = 0; i < lines.length; i++) {
+                            var line = lines[i];
+                            var fc = line.split(',')[0].trim();
+                            var n = parseInt(fc, 10);
+                            if (!isNaN(n) && n === fr) {
+                                var hash = line.indexOf('#');
+                                var code = hash >= 0 ? line.slice(0, hash).replace(/\s+$/, '') : line.replace(/\s+$/, '');
+                                var newLine = code.length ? (code + ' # ' + label) : ('# ' + label);
+                                lines[i] = newLine;
+                                found = true;
+                                break;
+                            }
+                            offset += line.length + 1;
+                        }
+                        if (!found) {
+                            alert('No line found for frame ' + fr + '.');
+                            return;
+                        }
+                        setHuman(lines.join('\n'));
+                        try {
+                            selectInTextarea(offset, 0);
+                        } catch (e) {}
+                        render(input.value);
+                    } catch (e) {}
+                }
+
+                $("bookmark-add-current").onclick = function() {
+                    addLabelAtCaret();
+                };
+                $("bookmark-add-by-frame").onclick = function() {
+                    addLabelAtFrame();
+                };
+
+                // Keyboard shortcuts
+                window.addEventListener('keydown', function(e) {
+                    var isMod = e.ctrlKey || e.metaKey;
+                    if (isMod && !e.altKey && !e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+                        e.preventDefault();
+                        open();
+                    } else if (isMod && e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+                        e.preventDefault();
+                        addLabelAtCaret();
+                    } else if (overlay.style.display !== 'none' && e.key === 'Escape') {
+                        e.preventDefault();
+                        close();
+                    }
+                }, true);
+            })();
+        });
+    </script>
+
+    <script>
+        // ---- TMInterface-style Bruteforce ----
+        window.addEventListener("DOMContentLoaded", function() {
+            try {
+                var $ = function(id) {
+                    return document.getElementById(id);
+                };
+                var controls = document.querySelector(".section-controls");
+                if (!controls || $("bf-panel")) return;
+
+                function el(tag, attrs, text) {
+                    var n = document.createElement(tag);
+                    attrs = attrs || {};
+                    Object.keys(attrs).forEach(function(k) {
+                        if (k === "style") n.style.cssText = attrs[k];
+                        else if (k === "className") n.className = attrs[k];
+                        else n.setAttribute(k, attrs[k]);
+                    });
+                    if (text != null) n.textContent = text;
+                    return n;
+                }
+
+                var panel = el("div", {
+                    id: "bf-panel",
+                    style: "margin-top:8px;padding:10px;border:1px solid #2a2a3a;border-radius:8px;background:#101018;display:flex;flex-direction:column;gap:8px;"
+                });
+                var title = el("div", {
+                    style: "display:flex;align-items:center;justify-content:space-between;gap:8px;"
+                });
+                title.appendChild(el("strong", {
+                    style: "font-size:13px;"
+                }, "Bruteforce"));
+                title.appendChild(el("span", {
+                    style: "font-size:11px;color:#aaa;"
+                }, "Rolling-best search; runs continuously until cancelled."));
+                panel.appendChild(title);
+
+                function addField(row, id, label, value, width, type) {
+                    var wrap = el("label", {
+                        style: "display:flex;flex-direction:column;gap:3px;font-size:11px;color:#bbb;"
+                    });
+                    wrap.appendChild(document.createTextNode(label));
+                    var input = el("input", {
+                        id: id,
+                        type: type || "number",
+                        value: value,
+                        style: "width:" + width + "px;background:#0f0f17;color:#eee;border:1px solid #2a2a3a;border-radius:6px;padding:6px 8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:12px;"
+                    });
+                    wrap.appendChild(input);
+                    row.appendChild(wrap);
+                    return input;
+                }
+                var row1 = el("div", {
+                    style: "display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;"
+                });
+                addField(row1, "bf-start", "Start frame", "0", 90);
+                var finishInput = addField(row1, "bf-finish", "Finish search", "30", 100);
+                finishInput.title = "Last frame on which bruteforce may insert, remove, or retime an input. This is an absolute frame number, not a range length.";
+                var stepInput = addField(row1, "bf-step", "Frame step", "1", 100, "text");
+                stepInput.placeholder = "1 or 1-10";
+                stepInput.title = "Use a single number, or a range like 1-10 to roll a random frame step for each candidate.";
+                var holdInput = addField(row1, "bf-hold", "Hold length", "8", 110, "text");
+                holdInput.placeholder = "8 or 1-10";
+                holdInput.title = "Use a single number, or a range like 1-10 to roll a random hold length for each candidate.";
+                var changedInput = addField(row1, "bf-max-changes", "Max changed inputs", "1", 135);
+                changedInput.min = "1";
+                changedInput.max = "100";
+                changedInput.title = "Each candidate changes between 1 and this many input events or input blocks.";
+                var timeDiffInput = addField(row1, "bf-max-time-diff", "Max time difference", "5", 145);
+                timeDiffInput.min = "0";
+                timeDiffInput.max = "100000";
+                timeDiffInput.title = "Maximum number of frames an existing input event may be shifted earlier or later. Use 0 to disable timing shifts.";
+                addField(row1, "bf-eval", "Evaluate at frame", "600", 120);
+                var batchInput = addField(row1, "bf-concurrency", "Batch / wave", "48", 105);
+                batchInput.title = "A new rolling best is applied after each wave. Use 1 for strict candidate-by-candidate updating.";
+                panel.appendChild(row1);
+                var helpText = el("div", {
+                    id: "bf-context-help",
+                    style: "font-size:11px;color:#8f8fa3;margin-top:-2px;"
+                }, "");
+                panel.appendChild(helpText);
+
+                var row2 = el("div", {
+                    style: "display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;"
+                });
+                var keyWrap = el("label", {
+                    style: "display:flex;flex-direction:column;gap:3px;font-size:11px;color:#bbb;flex:1;min-width:320px;"
+                });
+                keyWrap.appendChild(document.createTextNode("Keysets to try (comma separated)"));
+                keyWrap.appendChild(el("input", {
+                    id: "bf-keysets",
+                    value: "w,wa,wd,a,d,",
+                    style: "background:#0f0f17;color:#eee;border:1px solid #2a2a3a;border-radius:6px;padding:6px 8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:12px;"
+                }));
+                row2.appendChild(keyWrap);
+                var modeWrap = el("label", {
+                    style: "display:flex;flex-direction:column;gap:3px;font-size:11px;color:#bbb;"
+                });
+                modeWrap.appendChild(document.createTextNode("Mutation mode"));
+                var modeSel = el("select", {
+                    id: "bf-mutation-mode",
+                    style: "width:190px;background:#0f0f17;color:#eee;border:1px solid #2a2a3a;border-radius:6px;padding:6px 8px;font-size:12px;"
+                });
+                [
+                    ["inputs_timing", "New inputs + timing"],
+                    ["inputs_only", "New inputs only"],
+                    ["timing_only", "Changed timings only"],
+                    ["lis", "LIS (Low Input Strat)"]
+                ].forEach(function(o) {
+                    modeSel.appendChild(el("option", {
+                        value: o[0]
+                    }, o[1]));
+                });
+                modeSel.title = "Mixed mode combines inserted inputs and timing shifts. Timing-only preserves keysets. LIS removes existing input-change events and can weight fewer inputs against the selected objective.";
+                modeWrap.appendChild(modeSel);
+                row2.appendChild(modeWrap);
+                var objWrap = el("label", {
+                    style: "display:flex;flex-direction:column;gap:3px;font-size:11px;color:#bbb;"
+                });
+                objWrap.appendChild(document.createTextNode("Objective"));
+                var sel = el("select", {
+                    id: "bf-objective",
+                    style: "width:190px;background:#0f0f17;color:#eee;border:1px solid #2a2a3a;border-radius:6px;padding:6px 8px;font-size:12px;"
+                });
+                [
+                    ["checkpoint_speed", "Checkpoint + speed"],
+                    ["finish", "Finish time"],
+                    ["speed", "Max speed"],
+                    ["distance_speed", "Distance + speed"],
+                    ["x", "Max X"],
+                    ["-x", "Min X"],
+                    ["y", "Max Y"],
+                    ["-y", "Min Y"],
+                    ["z", "Max Z"],
+                    ["-z", "Min Z"]
+                ].forEach(function(o) {
+                    var opt = el("option", {
+                        value: o[0]
+                    }, o[1]);
+                    sel.appendChild(opt);
+                });
+                objWrap.appendChild(sel);
+                row2.appendChild(objWrap);
+                panel.appendChild(row2);
+
+                var scoreRow = el("div", {
+                    style: "display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:8px;border:1px solid #242435;border-radius:7px;background:#0d0d14;"
+                });
+                var targetX = addField(scoreRow, "bf-target-x", "Target X", "0", 88, "number");
+                targetX.step = "any";
+                var targetY = addField(scoreRow, "bf-target-y", "Target Y", "0", 88, "number");
+                targetY.step = "any";
+                var targetZ = addField(scoreRow, "bf-target-z", "Target Z", "0", 88, "number");
+                targetZ.step = "any";
+                var useFreeCamBtn = el("button", {
+                    id: "bf-use-freecam",
+                    title: "Copy the latest active free-camera coordinates into the target point."
+                }, "Use Free Cam");
+                scoreRow.appendChild(useFreeCamBtn);
+                var camReadout = el("span", {
+                    id: "bf-freecam-readout",
+                    style: "font-size:11px;color:#8f8fa3;min-width:210px;padding-bottom:7px;"
+                }, "Free cam: not active");
+                scoreRow.appendChild(camReadout);
+
+                function addSlider(row, id, label, value, leftText, rightText) {
+                    var wrap = el("label", {
+                        style: "display:flex;flex-direction:column;gap:4px;font-size:11px;color:#bbb;min-width:280px;flex:1;"
+                    });
+                    var head = el("div", {
+                        style: "display:flex;justify-content:space-between;gap:8px;"
+                    });
+                    head.appendChild(document.createTextNode(label));
+                    var out = el("strong", {
+                        id: id + "-value",
+                        style: "color:#ddd;font-variant-numeric:tabular-nums;"
+                    }, value + "%");
+                    head.appendChild(out);
+                    wrap.appendChild(head);
+                    var slider = el("input", {
+                        id: id,
+                        type: "range",
+                        min: "0",
+                        max: "100",
+                        step: "1",
+                        value: String(value),
+                        style: "width:100%;"
+                    });
+                    wrap.appendChild(slider);
+                    var ends = el("div", {
+                        style: "display:flex;justify-content:space-between;color:#777;font-size:10px;"
+                    });
+                    ends.appendChild(document.createTextNode(leftText));
+                    ends.appendChild(document.createTextNode(rightText));
+                    wrap.appendChild(ends);
+                    row.appendChild(wrap);
+                    slider.addEventListener("input", function() {
+                        out.textContent = slider.value + "%";
+                    });
+                    return slider;
+                }
+                var distanceWeightSlider = addSlider(scoreRow, "bf-distance-weight", "Distance / speed weighting", 50, "0% = max speed", "100% = closest point");
+                var lisWeightSlider = addSlider(scoreRow, "bf-lis-weight", "LIS low-input weighting", 50, "0% = objective", "100% = fewest inputs");
+                panel.appendChild(scoreRow);
+
+                var driveRow = el("div", {
+                    style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px;border:1px solid #242435;border-radius:7px;background:#0d0d14;"
+                });
+                var driveSpeedWrap = el("label", {
+                    style: "display:flex;flex-direction:column;gap:4px;font-size:11px;color:#bbb;min-width:260px;"
+                });
+                var driveSpeedHead = el("div", {
+                    style: "display:flex;justify-content:space-between;"
+                });
+                driveSpeedHead.appendChild(document.createTextNode("Live driving slow-motion speed"));
+                var driveSpeedOut = el("strong", {
+                    id: "tas-drive-speed-value",
+                    style: "color:#ddd;font-variant-numeric:tabular-nums;"
+                }, "25%");
+                driveSpeedHead.appendChild(driveSpeedOut);
+                driveSpeedWrap.appendChild(driveSpeedHead);
+                var driveSpeed = el("input", {
+                    id: "tas-drive-speed",
+                    type: "range",
+                    min: "5",
+                    max: "100",
+                    step: "5",
+                    value: "25",
+                    style: "width:260px;"
+                });
+                driveSpeedWrap.appendChild(driveSpeed);
+                driveRow.appendChild(driveSpeedWrap);
+                var driveStartBtn = el("button", {
+                    id: "tas-drive-start",
+                    title: "Replay the TAS to its final input frame, focus the game window, then take control. Press F8 in-game to stop and keep inputs."
+                }, "Drive from TAS End");
+                var driveStopBtn = el("button", {
+                    id: "tas-drive-stop",
+                    title: "Stop driving and append the recorded continuation inputs to the TAS editor. You can also press F8 in the game window.",
+                    disabled: "disabled"
+                }, "Stop & Keep Inputs");
+                var driveDiscardBtn = el("button", {
+                    id: "tas-drive-discard",
+                    title: "Stop this attempt and discard every input recorded after the TAS endpoint.",
+                    disabled: "disabled"
+                }, "Stop Without Saving");
+                driveRow.appendChild(driveStartBtn);
+                driveRow.appendChild(driveStopBtn);
+                driveRow.appendChild(driveDiscardBtn);
+                var driveReadout = el("span", {
+                    id: "tas-drive-readout",
+                    style: "font-size:11px;color:#8f8fa3;"
+                }, "");
+                driveRow.appendChild(driveReadout);
+
+                var driveBindingDefaults = {
+                    forward: "KeyW",
+                    left: "KeyA",
+                    backward: "KeyS",
+                    right: "KeyD",
+                    reset: "KeyR",
+                    save: "F8",
+                    restart: "Backspace"
+                };
+                var driveBindings = Object.assign({}, driveBindingDefaults);
+                try {
+                    var savedDriveBindings = JSON.parse(localStorage.getItem("polytrackTasDriveBindings") || "null");
+                    if (savedDriveBindings && typeof savedDriveBindings === "object") {
+                        Object.keys(driveBindingDefaults).forEach(function(k) {
+                            if (typeof savedDriveBindings[k] === "string" && savedDriveBindings[k]) driveBindings[k] = savedDriveBindings[k];
+                        });
+                    }
+                } catch (e) {}
+
+                function prettyDriveCode(code) {
+                    code = String(code || "");
+                    var named = {
+                        ArrowUp: "Up Arrow",
+                        ArrowDown: "Down Arrow",
+                        ArrowLeft: "Left Arrow",
+                        ArrowRight: "Right Arrow",
+                        Space: "Space",
+                        Backspace: "Backspace",
+                        Enter: "Enter",
+                        Tab: "Tab",
+                        Escape: "Escape",
+                        ShiftLeft: "Left Shift",
+                        ShiftRight: "Right Shift",
+                        ControlLeft: "Left Ctrl",
+                        ControlRight: "Right Ctrl",
+                        AltLeft: "Left Alt",
+                        AltRight: "Right Alt",
+                        MetaLeft: "Left Meta",
+                        MetaRight: "Right Meta",
+                        NumpadAdd: "Numpad +",
+                        NumpadSubtract: "Numpad -",
+                        NumpadMultiply: "Numpad ×",
+                        NumpadDivide: "Numpad ÷"
+                    };
+                    if (named[code]) return named[code];
+                    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+                    if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+                    if (/^Numpad[0-9]$/.test(code)) return "Numpad " + code.slice(6);
+                    return code || "Unbound";
+                }
+
+                function saveDriveBindings() {
+                    try {
+                        localStorage.setItem("polytrackTasDriveBindings", JSON.stringify(driveBindings));
+                    } catch (e) {}
+                }
+
+                function driveHotkeyText() {
+                    return prettyDriveCode(driveBindings.save) + " saves; " + prettyDriveCode(driveBindings.restart) + " restarts";
+                }
+                var driveSettings = el("details", {
+                    id: "tas-drive-settings",
+                    style: "flex:1 0 100%;border-top:1px solid #242435;padding-top:7px;margin-top:1px;"
+                });
+                var driveSettingsSummary = el("summary", {
+                    style: "cursor:pointer;color:#bbb;font-size:11px;user-select:none;"
+                }, "Drive control settings");
+                driveSettings.appendChild(driveSettingsSummary);
+                var driveSettingsGrid = el("div", {
+                    style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px;margin-top:8px;"
+                });
+                driveSettings.appendChild(driveSettingsGrid);
+                var driveBindingButtons = {};
+                var activeDriveCapture = null;
+
+                function updateDriveBindingUi() {
+                    Object.keys(driveBindingButtons).forEach(function(k) {
+                        driveBindingButtons[k].textContent = prettyDriveCode(driveBindings[k]);
+                    });
+                    driveReadout.textContent = "Configured controls active — " + driveHotkeyText() + ".";
+                    driveStartBtn.title = "Replay the TAS to its final input frame, focus the game window, then take control. " + prettyDriveCode(driveBindings.save) + " stops and keeps inputs; " + prettyDriveCode(driveBindings.restart) + " retries.";
+                    driveStopBtn.title = "Stop driving and append the recorded continuation inputs to the TAS editor. You can also press " + prettyDriveCode(driveBindings.save) + " in the game window.";
+                }
+
+                function addDriveBinding(action, label) {
+                    var wrap = el("label", {
+                        style: "display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:11px;color:#aaa;"
+                    });
+                    wrap.appendChild(document.createTextNode(label));
+                    var btn = el("button", {
+                        type: "button",
+                        style: "min-width:82px;padding:5px 8px;font-size:11px;"
+                    }, prettyDriveCode(driveBindings[action]));
+                    driveBindingButtons[action] = btn;
+                    btn.addEventListener("click", function() {
+                        if (activeDriveCapture) {
+                            try {
+                                window.removeEventListener("keydown", activeDriveCapture, true);
+                            } catch (e) {}
+                            activeDriveCapture = null;
+                        }
+                        btn.textContent = "Press a key…";
+                        activeDriveCapture = function(ev) {
+                            try {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                            } catch (e) {}
+                            if (!ev.code) return;
+                            driveBindings[action] = ev.code;
+                            saveDriveBindings();
+                            try {
+                                window.removeEventListener("keydown", activeDriveCapture, true);
+                            } catch (e) {}
+                            activeDriveCapture = null;
+                            updateDriveBindingUi();
+                        };
+                        window.addEventListener("keydown", activeDriveCapture, true);
+                    });
+                    wrap.appendChild(btn);
+                    driveSettingsGrid.appendChild(wrap);
+                }
+                addDriveBinding("forward", "Accelerate");
+                addDriveBinding("left", "Steer left");
+                addDriveBinding("backward", "Brake / reverse");
+                addDriveBinding("right", "Steer right");
+                addDriveBinding("reset", "Reset");
+                addDriveBinding("save", "Save & stop");
+                addDriveBinding("restart", "Restart attempt");
+                var resetDriveBindingsBtn = el("button", {
+                    type: "button",
+                    style: "padding:5px 8px;font-size:11px;justify-self:start;"
+                }, "Reset defaults");
+                resetDriveBindingsBtn.addEventListener("click", function() {
+                    driveBindings = Object.assign({}, driveBindingDefaults);
+                    saveDriveBindings();
+                    updateDriveBindingUi();
+                });
+                driveSettingsGrid.appendChild(resetDriveBindingsBtn);
+                driveRow.appendChild(driveSettings);
+                panel.appendChild(driveRow);
+                updateDriveBindingUi();
+
+                var row3 = el("div", {
+                    style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;"
+                });
+                var runBtn = el("button", {
+                    id: "bf-run"
+                }, "Run Bruteforce");
+                var cancelBtn = el("button", {
+                    id: "bf-cancel"
+                }, "Cancel");
+                var applyBestBtn = el("button", {
+                    id: "bf-apply-best",
+                    disabled: "disabled"
+                }, "Apply Best");
+                row3.appendChild(runBtn);
+                row3.appendChild(cancelBtn);
+                row3.appendChild(applyBestBtn);
+                panel.appendChild(row3);
+                var status = el("div", {
+                    id: "bf-status",
+                    style: "display:block;width:100%;min-height:104px;box-sizing:border-box;font-size:12px;line-height:1.4;color:#bbb;white-space:pre-wrap;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;"
+                }, "Idle.");
+                panel.appendChild(status);
+                var statusReservedHeight = 104;
+
+                function reserveStatusSpace() {
+                    try {
+                        requestAnimationFrame(function() {
+                            var needed = Math.ceil(status.scrollHeight || 0);
+                            if (needed > statusReservedHeight) {
+                                statusReservedHeight = needed;
+                                status.style.minHeight = statusReservedHeight + "px";
+                            }
+                        });
+                    } catch (e) {}
+                }
+                try {
+                    new MutationObserver(reserveStatusSpace).observe(status, {
+                        childList: true,
+                        subtree: true,
+                        characterData: true
+                    });
+                } catch (e) {}
+                reserveStatusSpace();
+
+                controls.insertBefore(panel, controls.firstChild);
+
+                function normalizeKeys(str) {
+                    var order = ["w", "a", "s", "d", "r"],
+                        set = new Set();
+                    String(str || "").toLowerCase().split("").forEach(function(ch) {
+                        if (order.indexOf(ch) >= 0) set.add(ch);
+                    });
+                    return order.filter(function(k) {
+                        return set.has(k);
+                    }).join("");
+                }
+
+                function parseEntries(text) {
+                    return String(text || "").split("\n").map(function(line) {
+                            var idx = line.indexOf("#");
+                            return idx >= 0 ? line.slice(0, idx) : line;
+                        })
+                        .filter(function(line) {
+                            return line.trim() !== "";
+                        })
+                        .map(function(line) {
+                            var parts = line.split(",");
+                            var frame = parseInt(parts[0], 10);
+                            var keys = normalizeKeys((parts.slice(1).join(",") || "").trim());
+                            return {
+                                frame: frame,
+                                keys: keys
+                            };
+                        })
+                        .filter(function(e) {
+                            return !isNaN(e.frame);
+                        })
+                        .sort(function(a, b) {
+                            return a.frame - b.frame;
+                        });
+                }
+
+                function stateAt(entries, frame) {
+                    var state = "";
+                    for (var i = 0; i < entries.length; i++) {
+                        if (entries[i].frame <= frame) state = entries[i].keys;
+                        else break;
+                    }
+                    return state;
+                }
+
+                function entriesToText(entries) {
+                    return entries.slice().sort(function(a, b) {
+                        return a.frame - b.frame;
+                    }).map(function(e) {
+                        return e.frame + "," + normalizeKeys(e.keys);
+                    }).join("\n");
+                }
+
+                function compactEntries(entries) {
+                    var byFrame = new Map();
+                    (entries || []).forEach(function(e) {
+                        if (e && !isNaN(e.frame)) byFrame.set(e.frame, normalizeKeys(e.keys));
+                    });
+                    var sorted = Array.from(byFrame.entries()).map(function(kv) {
+                        return {
+                            frame: kv[0],
+                            keys: kv[1]
+                        };
+                    }).sort(function(a, b) {
+                        return a.frame - b.frame;
+                    });
+                    var out = [],
+                        previous = "";
+                    sorted.forEach(function(e) {
+                        if (e.keys === previous) return;
+                        out.push({
+                            frame: e.frame,
+                            keys: e.keys
+                        });
+                        previous = e.keys;
+                    });
+                    return out;
+                }
+
+                function countInputEvents(entries) {
+                    return compactEntries(entries).length;
+                }
+
+                function makeCandidate(baseEntries, startFrame, holdFrames, keys) {
+                    var endFrame = Math.max(startFrame + 1, startFrame + holdFrames);
+                    var revert = stateAt(baseEntries, endFrame);
+                    var map = new Map();
+                    baseEntries.forEach(function(e) {
+                        if (!(e.frame > startFrame && e.frame < endFrame)) map.set(e.frame, e.keys);
+                    });
+                    map.set(startFrame, normalizeKeys(keys));
+                    map.set(endFrame, normalizeKeys(revert));
+                    return entriesToText(Array.from(map.entries()).map(function(kv) {
+                        return {
+                            frame: kv[0],
+                            keys: kv[1]
+                        };
+                    }));
+                }
+
+                function readInt(id, fallback, min, max) {
+                    var n = parseInt(($(id) && $(id).value) || "", 10);
+                    if (isNaN(n)) n = fallback;
+                    if (typeof min === "number") n = Math.max(min, n);
+                    if (typeof max === "number") n = Math.min(max, n);
+                    return n;
+                }
+
+                function readFloat(id, fallback, min, max) {
+                    var n = parseFloat((($(id) && $(id).value) || ""));
+                    if (!Number.isFinite(n)) n = fallback;
+                    if (typeof min === "number") n = Math.max(min, n);
+                    if (typeof max === "number") n = Math.min(max, n);
+                    return n;
+                }
+
+                function clampInt(n, fallback, min, max) {
+                    n = parseInt(n, 10);
+                    if (isNaN(n)) n = fallback;
+                    if (typeof min === "number") n = Math.max(min, n);
+                    if (typeof max === "number") n = Math.min(max, n);
+                    return n;
+                }
+
+                function readIntRange(id, fallback, min, max) {
+                    var raw = String((($(id) && $(id).value) || "")).trim().toLowerCase();
+                    raw = raw.replace(/[–—]/g, "-").replace(/\s+to\s+/g, "-").replace(/\s*\.\.\s*/g, "-");
+                    var m = raw.match(/^(\d+)\s*-\s*(\d+)$/);
+                    if (m) {
+                        var a = clampInt(m[1], fallback, min, max);
+                        var b = clampInt(m[2], fallback, min, max);
+                        if (b < a) {
+                            var t = a;
+                            a = b;
+                            b = t;
+                        }
+                        return {
+                            min: a,
+                            max: b,
+                            fixed: a === b,
+                            label: a === b ? String(a) : (a + "-" + b)
+                        };
+                    }
+                    var n = clampInt(raw, fallback, min, max);
+                    return {
+                        min: n,
+                        max: n,
+                        fixed: true,
+                        label: String(n)
+                    };
+                }
+
+                function rollInt(spec) {
+                    if (!spec || spec.max <= spec.min) return spec ? spec.min : 0;
+                    return spec.min + Math.floor(Math.random() * (spec.max - spec.min + 1));
+                }
+
+                function randomInt(min, max) {
+                    min = Math.ceil(min);
+                    max = Math.floor(max);
+                    if (max <= min) return min;
+                    return min + Math.floor(Math.random() * (max - min + 1));
+                }
+
+                function selectedLineFrame() {
+                    try {
+                        var ta = $("decoded");
+                        if (!ta) return null;
+                        var text = ta.value || "";
+                        var start = text.lastIndexOf("\n", Math.max(0, ta.selectionStart - 1)) + 1;
+                        var line = text.slice(start, text.indexOf("\n", start) === -1 ? text.length : text.indexOf("\n", start));
+                        var n = parseInt(line.split(",")[0], 10);
+                        return isNaN(n) ? null : n;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+
+                function bestSummary(best) {
+                    if (!best) return "No best candidate yet.";
+                    var st = best.state || {};
+                    return (best.label || ("#" + best.index)) + " | score " + Number(best.score || 0).toFixed(3) + (best.selectionScore != null && Math.abs(Number(best.selectionScore) - Number(best.score || 0)) > 1e-9 ? (" | combined " + Number(best.selectionScore).toFixed(3)) : "") + (best.inputCount != null ? (" | inputs " + best.inputCount) : "") + " | cp " + (st.nextCheckpointIndex != null ? st.nextCheckpointIndex : "?") + " | speed " + (st.speedKmh != null ? Number(st.speedKmh).toFixed(2) : "?") + " km/h" + (st.distanceToTarget != null ? (" | target " + Number(st.distanceToTarget).toFixed(2) + " m") : "");
+                }
+
+                try {
+                    var sf = selectedLineFrame();
+                    if (sf != null && $("bf-start")) {
+                        $("bf-start").value = String(sf);
+                        if ($("bf-finish") && readInt("bf-finish", 0, 0) <= sf) $("bf-finish").value = String(sf + 30);
+                    }
+                } catch (e) {}
+
+                var lastBest = null;
+                var bfSession = null;
+
+                function candidatesPerSecond(session, completed) {
+                    if (!session || !session.startedAt) return 0;
+                    var elapsedSeconds = Math.max(0.001, (performance.now() - session.startedAt) / 1000);
+                    return Math.max(0, completed || 0) / elapsedSeconds;
+                }
+
+                function speedLine(session, completed) {
+                    return "Candidates/s: " + candidatesPerSecond(session, completed).toFixed(1);
+                }
+
+                function shiftOneInputTiming(entries, session, blockedFrames) {
+                    if (!entries.length || session.maxTimeDifference < 1) return null;
+                    var eligible = [];
+                    for (var i = 0; i < entries.length; i++) {
+                        var item = entries[i];
+                        if (item.frame < session.start || item.frame > session.finish) continue;
+                        if (blockedFrames && blockedFrames.has(item.frame)) continue;
+                        var previousFrame = i > 0 ? entries[i - 1].frame : -1;
+                        var nextFrame = i + 1 < entries.length ? entries[i + 1].frame : Number.MAX_SAFE_INTEGER;
+                        var low = Math.max(session.start, previousFrame + 1, item.frame - session.maxTimeDifference);
+                        var high = Math.min(session.finish, nextFrame - 1, item.frame + session.maxTimeDifference);
+                        if (low < item.frame || high > item.frame) eligible.push({
+                            index: i,
+                            low: low,
+                            high: high
+                        });
+                    }
+                    if (!eligible.length) return null;
+                    for (var attempt = 0; attempt < Math.min(eligible.length * 2, 40); attempt++) {
+                        var picked = eligible[randomInt(0, eligible.length - 1)];
+                        var source = entries[picked.index];
+                        var targetChoices = [];
+                        for (var frame = picked.low; frame <= picked.high; frame++)
+                            if (frame !== source.frame && (!blockedFrames || !blockedFrames.has(frame))) targetChoices.push(frame);
+                        if (!targetChoices.length) continue;
+                        var target = targetChoices[randomInt(0, targetChoices.length - 1)];
+                        var shifted = entries.map(function(e) {
+                            return {
+                                frame: e.frame,
+                                keys: e.keys
+                            };
+                        });
+                        shifted[picked.index].frame = target;
+                        shifted.sort(function(a, b) {
+                            return a.frame - b.frame;
+                        });
+                        if (blockedFrames) {
+                            blockedFrames.add(source.frame);
+                            blockedFrames.add(target);
+                        }
+                        return {
+                            text: entriesToText(shifted),
+                            from: source.frame,
+                            to: target,
+                            difference: target - source.frame,
+                            keys: source.keys
+                        };
+                    }
+                    return null;
+                }
+
+                function buildMutant(session, baseText, candidateIndex) {
+                    var workingText = baseText;
+                    var workingEntries = parseEntries(workingText);
+                    var stepUsed = rollInt(session.stepSpec);
+                    var holdUsed = rollInt(session.holdSpec);
+                    var changes = [];
+                    var timingChanges = [];
+                    var endFrame = session.finish;
+                    var requestedChanges = randomInt(1, session.maxChangedInputs);
+                    var timingOnly = session.mutationMode === "timing_only";
+                    var inputOnly = session.mutationMode === "inputs_only";
+                    var lisOnly = session.mutationMode === "lis";
+
+                    if (lisOnly) {
+                        var originalEntries = compactEntries(workingEntries);
+                        var originalInputCount = countInputEvents(originalEntries);
+                        var eligible = [];
+                        for (var li = 0; li < originalEntries.length; li++) {
+                            if (originalEntries[li].frame >= session.start && originalEntries[li].frame <= endFrame) eligible.push(li);
+                        }
+                        var removable = Math.min(requestedChanges, eligible.length, Math.max(0, originalEntries.length - 1));
+                        var selected = new Set();
+                        if (removable > 0 && eligible.length) selected.add(eligible[candidateIndex % eligible.length]);
+                        while (selected.size < removable) selected.add(eligible[randomInt(0, eligible.length - 1)]);
+                        var removed = Array.from(selected).sort(function(a, b) {
+                            return b - a;
+                        }).map(function(idx) {
+                            return originalEntries[idx];
+                        });
+                        var lisEntries = originalEntries.map(function(e) {
+                            return {
+                                frame: e.frame,
+                                keys: e.keys
+                            };
+                        });
+                        Array.from(selected).sort(function(a, b) {
+                            return b - a;
+                        }).forEach(function(idx) {
+                            lisEntries.splice(idx, 1);
+                        });
+                        lisEntries = compactEntries(lisEntries);
+                        if (lisEntries.length && lisEntries.length < originalEntries.length) workingText = entriesToText(lisEntries);
+                        var lisInputCount = countInputEvents(parseEntries(workingText));
+                        var removedLabel = removed.slice().sort(function(a, b) {
+                            return a.frame - b.frame;
+                        }).map(function(e) {
+                            return "f" + e.frame + ":" + (e.keys || "<none>");
+                        }).join(" ");
+                        return {
+                            index: candidateIndex,
+                            label: "LIS removed " + Math.max(0, originalInputCount - lisInputCount) + " event" + ((originalInputCount - lisInputCount) === 1 ? "" : "s") + " | inputs " + originalInputCount + "→" + lisInputCount + " | " + (removedLabel || "no valid removal"),
+                            text: workingText,
+                            frameStep: stepUsed,
+                            hold: holdUsed,
+                            changes: removed.map(function(e) {
+                                return {
+                                    frame: e.frame,
+                                    keys: e.keys,
+                                    type: "lis_remove"
+                                };
+                            }),
+                            timingChanges: [],
+                            inputCount: lisInputCount,
+                            baseInputCount: originalInputCount
+                        };
+                    }
+
+                    var timingTarget = timingOnly ? requestedChanges : ((!inputOnly && session.maxTimeDifference > 0) ? 1 : 0);
+                    var inputTarget = timingOnly ? 0 : Math.max(0, requestedChanges - timingTarget);
+
+                    // Preserve the previous exhaustive one-input search when timing mutation is disabled.
+                    if (inputOnly && session.maxChangedInputs === 1 && session.stepSpec.fixed && session.holdSpec.fixed) {
+                        var positionCount = Math.max(1, Math.floor((session.finish - session.start) / session.stepSpec.min) + 1);
+                        var positionSlot = Math.floor(candidateIndex / session.keysets.length) % positionCount;
+                        var frame = session.start + positionSlot * session.stepSpec.min;
+                        var fixedKeys = session.keysets[candidateIndex % session.keysets.length];
+                        workingText = makeCandidate(workingEntries, frame, holdUsed, fixedKeys);
+                        changes.push({
+                            frame: frame,
+                            keys: fixedKeys,
+                            type: "input"
+                        });
+                        inputTarget = 0;
+                    }
+
+                    if (inputTarget > 0) {
+                        var possibleChanges = Math.max(1, Math.floor((session.finish - session.start) / Math.max(1, stepUsed)) + 1);
+                        var changeCount = Math.min(inputTarget, possibleChanges);
+                        var span = (changeCount - 1) * stepUsed;
+                        var maxAnchor = Math.max(session.start, endFrame - span);
+                        var anchor = randomInt(session.start, maxAnchor);
+                        for (var j = 0; j < changeCount; j++) {
+                            var changeFrame = Math.min(endFrame, anchor + j * stepUsed);
+                            var currentState = stateAt(workingEntries, changeFrame);
+                            var alternatives = session.keysets.filter(function(k) {
+                                return k !== currentState;
+                            });
+                            var pool = alternatives.length ? alternatives : session.keysets;
+                            var keys = pool[randomInt(0, pool.length - 1)];
+                            workingText = makeCandidate(workingEntries, changeFrame, holdUsed, keys);
+                            workingEntries = parseEntries(workingText);
+                            changes.push({
+                                frame: changeFrame,
+                                keys: keys,
+                                type: "input"
+                            });
+                        }
+                    }
+
+                    var blockedFrames = new Set();
+                    for (var k = 0; k < timingTarget; k++) {
+                        workingEntries = parseEntries(workingText);
+                        var shifted = shiftOneInputTiming(workingEntries, session, blockedFrames);
+                        if (!shifted) break;
+                        workingText = shifted.text;
+                        timingChanges.push(shifted);
+                        changes.push({
+                            frame: shifted.to,
+                            keys: shifted.keys,
+                            type: "timing",
+                            from: shifted.from,
+                            difference: shifted.difference
+                        });
+                    }
+
+                    // In mixed mode, if no timing event could move, fill the unused slot with a normal input mutation.
+                    if (!timingOnly && !inputOnly && timingTarget > 0 && timingChanges.length === 0 && session.keysets.length) {
+                        workingEntries = parseEntries(workingText);
+                        var fallbackFrame = randomInt(session.start, endFrame);
+                        var fallbackState = stateAt(workingEntries, fallbackFrame);
+                        var fallbackPool = session.keysets.filter(function(k) {
+                            return k !== fallbackState;
+                        });
+                        if (!fallbackPool.length) fallbackPool = session.keysets;
+                        var fallbackKeys = fallbackPool[randomInt(0, fallbackPool.length - 1)];
+                        workingText = makeCandidate(workingEntries, fallbackFrame, holdUsed, fallbackKeys);
+                        changes.push({
+                            frame: fallbackFrame,
+                            keys: fallbackKeys,
+                            type: "input"
+                        });
+                    }
+
+                    var compact = changes.map(function(c) {
+                        if (c.type === "timing") return "f" + c.from + "→" + c.frame + "(" + (c.difference > 0 ? "+" : "") + c.difference + "):" + (c.keys || "<none>");
+                        return "f" + c.frame + ":" + (c.keys || "<none>");
+                    }).join(" ");
+                    var modeLabel = timingOnly ? "timing only" : (inputOnly ? "inputs only" : "mixed");
+                    return {
+                        index: candidateIndex,
+                        label: changes.length + " change" + (changes.length === 1 ? "" : "s") + " | " + modeLabel + " | step" + stepUsed + " hold" + holdUsed + " | " + (compact || "no valid mutation"),
+                        text: workingText,
+                        frameStep: stepUsed,
+                        hold: holdUsed,
+                        changes: changes,
+                        timingChanges: timingChanges,
+                        inputCount: countInputEvents(parseEntries(workingText))
+                    };
+                }
+
+                function finishSession(message) {
+                    if (!bfSession) return;
+                    bfSession.running = false;
+                    lastBest = bfSession.currentBest || lastBest;
+                    applyBestBtn.disabled = !(lastBest && lastBest.text);
+                    var finalText = message || ("Stopped. Tested " + bfSession.tested + " candidates across " + bfSession.round + " rolling waves.\nImprovements accepted: " + bfSession.improvements + "\nBest: " + bestSummary(lastBest) + "\nClick Apply Best to copy it into the editor, then Apply to send it to the selected ghost.");
+                    status.textContent = finalText + "\n" + speedLine(bfSession, bfSession.tested);
+                }
+
+                function sendNextWave() {
+                    var session = bfSession;
+                    if (!session || !session.running) return;
+                    if (session.cancelled) {
+                        finishSession("Bruteforce cancelled after " + session.tested + " candidates.\nBest retained: " + bestSummary(session.currentBest));
+                        return;
+                    }
+                    var waveSize = session.batchSize;
+                    var baselineIndex = -1000000 - session.round;
+                    var candidates = [{
+                        index: baselineIndex,
+                        label: session.round === 0 ? "Original TAS baseline" : "Current rolling best baseline",
+                        text: session.currentBaseText,
+                        inputCount: countInputEvents(parseEntries(session.currentBaseText))
+                    }];
+                    for (var i = 0; i < waveSize; i++) {
+                        candidates.push(buildMutant(session, session.currentBaseText, session.nextCandidateIndex++));
+                    }
+
+                    session.currentWaveSize = waveSize;
+                    session.baselineIndex = baselineIndex;
+                    session.activeRunId = null;
+                    session.round++;
+                    status.textContent = "Rolling wave " + session.round + ": testing " + waveSize + " new candidates from the current best.\nTotal tested: " + session.tested + " (runs until Cancel).\n" + speedLine(session, session.tested) + "\nCurrent best: " + bestSummary(session.currentBest);
+                    window.electron.tasToolBruteforceRun({
+                        baseText: session.currentBaseText,
+                        candidates: candidates,
+                        evalFrame: session.evalFrame,
+                        objective: session.objective,
+                        lisMode: session.mutationMode === "lis",
+                        lisWeight: session.lisWeight,
+                        distanceWeight: session.distanceWeight,
+                        targetPoint: session.targetPoint,
+                        baselineIndex: baselineIndex,
+                        concurrency: Math.min(session.batchSize, candidates.length)
+                    });
+                }
+
+                runBtn.addEventListener("click", function() {
+                    try {
+                        if (bfSession && bfSession.running) {
+                            bfSession.cancelled = true;
+                            try {
+                                window.electron.tasToolBruteforceCancel({
+                                    runId: bfSession.activeRunId
+                                });
+                            } catch (e) {}
+                        }
+                        lastBest = null;
+                        applyBestBtn.disabled = true;
+                        var text = ($("decoded") && $("decoded").value) || "";
+                        var baseEntries = parseEntries(text);
+                        if (!baseEntries.length) {
+                            status.textContent = "No decoded TAS lines to mutate.";
+                            return;
+                        }
+                        var start = readInt("bf-start", 0, 0);
+                        var finish = readInt("bf-finish", start + 30, 0, 999999);
+                        if (finish < start) {
+                            status.textContent = "Finish search must be the same as or later than Start frame.";
+                            return;
+                        }
+                        var stepSpec = readIntRange("bf-step", 1, 1, 100000);
+                        var holdSpec = readIntRange("bf-hold", 8, 1, 100000);
+                        var maxChangedInputs = readInt("bf-max-changes", 1, 1, 100);
+                        var maxTimeDifference = readInt("bf-max-time-diff", 5, 0, 100000);
+                        var mutationMode = ($("bf-mutation-mode") && $("bf-mutation-mode").value) || "inputs_timing";
+                        var evalFrame = readInt("bf-eval", finish + holdSpec.max + maxTimeDifference + 60, 1, 999999);
+                        var batchSize = readInt("bf-concurrency", 48, 1, 128);
+                        var distanceWeight = readInt("bf-distance-weight", 50, 0, 100) / 100;
+                        var lisWeight = readInt("bf-lis-weight", 50, 0, 100) / 100;
+                        var targetPoint = {
+                            x: readFloat("bf-target-x", 0),
+                            y: readFloat("bf-target-y", 0),
+                            z: readFloat("bf-target-z", 0)
+                        };
+                        var keysets = String(($("bf-keysets") && $("bf-keysets").value) || "").split(",").map(function(k) {
+                            return normalizeKeys(k);
+                        });
+                        var seen = new Set(),
+                            unique = [];
+                        keysets.forEach(function(k) {
+                            if (!seen.has(k)) {
+                                seen.add(k);
+                                unique.push(k);
+                            }
+                        });
+                        if (mutationMode !== "timing_only" && mutationMode !== "lis" && !unique.length) {
+                            status.textContent = "Add at least one keyset for an input-changing mode.";
+                            return;
+                        }
+                        if (mutationMode === "timing_only" && maxTimeDifference < 1) {
+                            status.textContent = "Timing-only mode requires Max time difference to be at least 1.";
+                            return;
+                        }
+
+                        bfSession = {
+                            running: true,
+                            cancelled: false,
+                            currentBaseText: text,
+                            currentBest: null,
+                            currentBestScore: null,
+                            currentBestInputCount: null,
+                            startedAt: performance.now(),
+                            tested: 0,
+                            improvements: 0,
+                            round: 0,
+                            nextCandidateIndex: 0,
+                            activeRunId: null,
+                            currentWaveSize: 0,
+                            baselineIndex: null,
+                            start: start,
+                            finish: finish,
+                            stepSpec: stepSpec,
+                            holdSpec: holdSpec,
+                            maxChangedInputs: maxChangedInputs,
+                            maxTimeDifference: maxTimeDifference,
+                            mutationMode: mutationMode,
+                            evalFrame: evalFrame,
+                            batchSize: batchSize,
+                            keysets: unique,
+                            objective: ($("bf-objective") && $("bf-objective").value) || "checkpoint_speed",
+                            distanceWeight: distanceWeight,
+                            lisWeight: lisWeight,
+                            targetPoint: targetPoint
+                        };
+                        sendNextWave();
+                    } catch (e) {
+                        status.textContent = "Bruteforce setup failed: " + (e && e.message ? e.message : e);
+                    }
+                });
+
+                cancelBtn.addEventListener("click", function() {
+                    try {
+                        if (bfSession) bfSession.cancelled = true;
+                        window.electron.tasToolBruteforceCancel({
+                            runId: bfSession && bfSession.activeRunId
+                        });
+                        status.textContent = "Cancelling...";
+                    } catch (e) {}
+                });
+                applyBestBtn.addEventListener("click", function() {
+                    try {
+                        if (!lastBest || !lastBest.text) return;
+                        setHuman(lastBest.text);
+                        status.textContent = "Best candidate applied to editor. Click Apply to send it to the game ghost.";
+                    } catch (e) {}
+                });
+
+                var currentFreeCamCoords = null;
+
+                function setFieldVisible(input, visible) {
+                    if (!input) return;
+                    var wrap = input.parentElement;
+                    if (wrap) wrap.style.display = visible ? "flex" : "none";
+                    input.disabled = !visible;
+                }
+
+                function setNodeVisible(node, visible, shownDisplay) {
+                    if (!node) return;
+                    node.style.display = visible ? (shownDisplay || "") : "none";
+                    if ("disabled" in node) node.disabled = !visible;
+                }
+
+                function refreshModeControls() {
+                    var mode = modeSel.value;
+                    var distanceMode = sel.value === "distance_speed";
+                    var usesNewInputs = mode === "inputs_timing" || mode === "inputs_only";
+                    var usesTiming = mode === "inputs_timing" || mode === "timing_only";
+                    var lisMode = mode === "lis";
+
+                    setFieldVisible(stepInput, usesNewInputs);
+                    setFieldVisible(holdInput, usesNewInputs);
+                    setFieldVisible(timeDiffInput, usesTiming);
+                    setNodeVisible(keyWrap, usesNewInputs, "flex");
+
+                    setFieldVisible(targetX, distanceMode);
+                    setFieldVisible(targetY, distanceMode);
+                    setFieldVisible(targetZ, distanceMode);
+                    setNodeVisible(useFreeCamBtn, distanceMode, "inline-block");
+                    setNodeVisible(camReadout, distanceMode, "inline");
+                    setFieldVisible(distanceWeightSlider, distanceMode);
+                    setFieldVisible(lisWeightSlider, lisMode);
+                    setNodeVisible(scoreRow, distanceMode || lisMode, "flex");
+
+                    var parts = [];
+                    if (mode === "inputs_timing") parts.push("Candidates insert or replace inputs and may shift one existing input timing.");
+                    else if (mode === "inputs_only") parts.push("Candidates only insert or replace inputs.");
+                    else if (mode === "timing_only") parts.push("Candidates only shift existing input timings; keysets, frame step and hold length are ignored.");
+                    else parts.push("LIS candidates remove existing input-change events; frame step, hold length, timing difference and keysets are ignored.");
+                    if (distanceMode) parts.push("Distance + speed uses the target coordinates and weighting slider.");
+                    if (lisMode) parts.push("The LIS slider balances the selected objective against fewer inputs.");
+                    parts.push("Inputs are searched inclusively from Start frame through Finish search; the search continues until Cancel.");
+                    helpText.textContent = parts.join(" ");
+                }
+                sel.addEventListener("change", refreshModeControls);
+                modeSel.addEventListener("change", refreshModeControls);
+                refreshModeControls();
+                useFreeCamBtn.addEventListener("click", function() {
+                    if (!currentFreeCamCoords) {
+                        status.textContent = "Enable free cam in the game first, then move it to the desired target point.";
+                        return;
+                    }
+                    targetX.value = Number(currentFreeCamCoords.x || 0).toFixed(3);
+                    targetY.value = Number(currentFreeCamCoords.y || 0).toFixed(3);
+                    targetZ.value = Number(currentFreeCamCoords.z || 0).toFixed(3);
+                });
+                if (window.electron && window.electron.onTasToolFreeCamCoords) {
+                    window.electron.onTasToolFreeCamCoords(function(info) {
+                        if (!info || info.active === false) {
+                            currentFreeCamCoords = null;
+                            camReadout.textContent = "Free cam: not active";
+                            return;
+                        }
+                        currentFreeCamCoords = {
+                            x: Number(info.x) || 0,
+                            y: Number(info.y) || 0,
+                            z: Number(info.z) || 0
+                        };
+                        camReadout.textContent = "Free cam: X " + currentFreeCamCoords.x.toFixed(2) + "  Y " + currentFreeCamCoords.y.toFixed(2) + "  Z " + currentFreeCamCoords.z.toFixed(2);
+                    });
+                }
+                driveSpeed.addEventListener("input", function() {
+                    driveSpeedOut.textContent = driveSpeed.value + "%";
+                    try {
+                        var rate = Math.max(.05, Number(driveSpeed.value) / 100);
+                        window.electron.tasToolSlowMoRate({
+                            rate: rate
+                        });
+                        window.electron.tasToolDriveRate({
+                            rate: rate
+                        });
+                    } catch (e) {}
+                });
+                driveStartBtn.addEventListener("click", function() {
+                    try {
+                        var text = ($("decoded") && $("decoded").value) || "";
+                        if (!parseEntries(text).length) {
+                            driveReadout.textContent = "Add at least one TAS input first.";
+                            return;
+                        }
+                        driveStartBtn.disabled = true;
+                        driveStopBtn.disabled = false;
+                        driveDiscardBtn.disabled = false;
+                        driveReadout.textContent = "Replaying to TAS end…";
+                        window.electron.tasToolDriveStart({
+                            text: text,
+                            rate: Math.max(.05, Number(driveSpeed.value) / 100),
+                            bindings: Object.assign({}, driveBindings)
+                        });
+                    } catch (e) {
+                        driveStartBtn.disabled = false;
+                        driveStopBtn.disabled = true;
+                        driveDiscardBtn.disabled = true;
+                        driveReadout.textContent = "Could not start: " + (e.message || e);
+                    }
+                });
+                driveStopBtn.addEventListener("click", function() {
+                    try {
+                        driveReadout.textContent = "Stopping and keeping continuation inputs…";
+                        window.electron.tasToolDriveStop({
+                            commit: true
+                        });
+                    } catch (e) {}
+                });
+                driveDiscardBtn.addEventListener("click", function() {
+                    try {
+                        driveReadout.textContent = "Stopping and discarding this continuation attempt…";
+                        window.electron.tasToolDriveStop({
+                            commit: false
+                        });
+                    } catch (e) {}
+                });
+                if (window.electron && window.electron.onTasToolDriveStatus) {
+                    window.electron.onTasToolDriveStatus(function(info) {
+                        info = info || {};
+                        if (info.status === "starting") driveReadout.textContent = "Sending drive mode to the replay screen for frame " + (info.takeoverFrame != null ? info.takeoverFrame : "…") + "…";
+                        else if (info.status === "restarting") {
+                            driveStartBtn.disabled = true;
+                            driveStopBtn.disabled = false;
+                            driveDiscardBtn.disabled = false;
+                            driveReadout.textContent = "Restarting from the TAS endpoint…";
+                        } else if (info.status === "received") driveReadout.textContent = "Replay screen received drive mode. Preparing the simulation…";
+                        else if (info.status === "preroll") driveReadout.textContent = "Fast-forwarding to frame " + (info.takeoverFrame != null ? info.takeoverFrame : "…") + "… the game window has keyboard focus.";
+                        else if (info.status === "driving") {
+                            driveStartBtn.disabled = true;
+                            driveStopBtn.disabled = false;
+                            driveDiscardBtn.disabled = false;
+                            driveReadout.textContent = "Driving at " + Math.round((Number(info.rate) || Number(driveSpeed.value) / 100) * 100) + "% — " + driveHotkeyText() + " from the TAS endpoint.";
+                        } else if (info.status === "rate") {
+                            driveReadout.textContent = "Driving at " + Math.round((Number(info.rate) || Number(driveSpeed.value) / 100) * 100) + "% — " + driveHotkeyText() + " from the TAS endpoint.";
+                        } else if (info.status === "stopped") {
+                            driveStartBtn.disabled = false;
+                            driveStopBtn.disabled = true;
+                            driveDiscardBtn.disabled = true;
+                            if (info.text) setHuman(info.text);
+                            driveReadout.textContent = "Continuation inputs kept in the editor through frame " + (info.frames != null ? info.frames : "…") + ".";
+                        } else if (info.status === "aborted") {
+                            driveStartBtn.disabled = false;
+                            driveStopBtn.disabled = true;
+                            driveDiscardBtn.disabled = true;
+                            driveReadout.textContent = "Continuation stopped and the recorded attempt was discarded.";
+                        } else if (info.status === "error") {
+                            driveStartBtn.disabled = false;
+                            driveStopBtn.disabled = true;
+                            driveDiscardBtn.disabled = true;
+                            driveReadout.textContent = "Drive mode error" + (info.stage ? " [" + info.stage + "]" : "") + ": " + (info.message || "unknown error");
+                        }
+                    });
+                }
+
+                if (window.electron && window.electron.onTasToolBruteforceProgress) {
+                    window.electron.onTasToolBruteforceProgress(function(p) {
+                        try {
+                            if (!p) return;
+                            var session = bfSession;
+                            if (!session || !session.running) return;
+                            if (p.runId && !session.activeRunId) session.activeRunId = p.runId;
+                            if (p.runId && session.activeRunId && p.runId !== session.activeRunId) return;
+                            var waveDone = Math.max(0, (typeof p.done === "number" ? p.done : 0) - 1);
+                            waveDone = Math.min(session.currentWaveSize, waveDone);
+                            var overallDone = session.tested + waveDone;
+                            var msg = "Rolling wave " + session.round + ": simulated " + waveDone + "/" + session.currentWaveSize + " new candidates.\nTotal tested: " + overallDone + " (runs until Cancel).\n" + speedLine(session, overallDone);
+                            if (p.best) msg += "\nWave leader: " + bestSummary(p.best);
+                            if (session.currentBest) msg += "\nAccepted rolling best: " + bestSummary(session.currentBest);
+                            status.textContent = msg;
+                        } catch (e) {}
+                    });
+                }
+                if (window.electron && window.electron.onTasToolBruteforceResult) {
+                    window.electron.onTasToolBruteforceResult(function(p) {
+                        try {
+                            if (!p) return;
+                            var session = bfSession;
+                            if (!session || !session.running) return;
+                            if (p.runId && session.activeRunId && p.runId !== session.activeRunId) return;
+                            if (p.status === "error") {
+                                finishSession("Bruteforce error: " + (p.message || "unknown error"));
+                                return;
+                            }
+                            if (p.status === "cancelled") {
+                                finishSession("Bruteforce cancelled after " + session.tested + " candidates.\nBest retained: " + bestSummary(session.currentBest));
+                                return;
+                            }
+
+                            session.tested += session.currentWaveSize;
+                            var roundBest = p.best || null;
+                            if (roundBest && roundBest.text) {
+                                var isMutation = roundBest.index !== session.baselineIndex;
+                                var roundInputCount = roundBest.inputCount != null ? Number(roundBest.inputCount) : countInputEvents(parseEntries(roundBest.text));
+                                roundBest.inputCount = roundInputCount;
+                                if (!session.currentBest) {
+                                    session.currentBest = roundBest;
+                                    session.currentBaseText = roundBest.text;
+                                    session.currentBestScore = Number(roundBest.score || 0);
+                                    session.currentBestInputCount = roundInputCount;
+                                    if (isMutation && p.improvesBaseline !== false) session.improvements++;
+                                } else if (isMutation && p.improvesBaseline === true) {
+                                    session.currentBest = roundBest;
+                                    session.currentBaseText = roundBest.text;
+                                    session.currentBestScore = Number(roundBest.score || 0);
+                                    session.currentBestInputCount = roundInputCount;
+                                    session.improvements++;
+                                }
+                            }
+                            lastBest = session.currentBest || lastBest;
+                            applyBestBtn.disabled = !(lastBest && lastBest.text);
+
+                            if (session.cancelled) {
+                                finishSession("Bruteforce cancelled after " + session.tested + " candidates.\nBest retained: " + bestSummary(session.currentBest));
+                                return;
+                            }
+                            status.textContent = "Wave " + session.round + " complete. Remaining candidates will now mutate the newest accepted best.\nTotal tested: " + session.tested + " (runs until Cancel).\n" + speedLine(session, session.tested) + "\nAccepted best: " + bestSummary(session.currentBest);
+                            setTimeout(sendNextWave, 0);
+                        } catch (e) {
+                            finishSession("Bruteforce result handling failed: " + (e && e.message ? e.message : e));
+                        }
+                    });
+                }
+            } catch (e) {}
+        });
+    </script>
+
+</body>
+
+</html>
