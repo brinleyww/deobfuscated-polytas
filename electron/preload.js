@@ -32,9 +32,17 @@ contextBridge.exposeInMainWorld("electron", {
     setTasGhosts: payload => ipcRenderer.send("tas-tool-set-ghosts", payload),
     onTasToolGhostsUpdate: cb => ipcRenderer.on("tas-tool-ghosts-update", ((evt, ...args) => cb(...args))),
     tasToolSetVisibility: visibleArray => ipcRenderer.send("tas-tool-set-visibility", visibleArray),
-    onTasToolSetVisibility: cb => ipcRenderer.on("tas-tool-set-visibility", ((evt, ...args) => cb(...args))),
+    onTasToolSetVisibility: cb => {
+        ipcRenderer.removeAllListeners("tas-tool-set-visibility");
+        ipcRenderer.on("tas-tool-set-visibility", ((evt, ...args) => cb(...args)));
+    },
+    offTasToolSetVisibility: () => ipcRenderer.removeAllListeners("tas-tool-set-visibility"),
     tasToolRequestLoad: index => ipcRenderer.send("tas-tool-request-load", index),
-    onTasToolRequestLoad: cb => ipcRenderer.on("tas-tool-request-load", ((evt, ...args) => cb(...args))),
+    onTasToolRequestLoad: cb => {
+        ipcRenderer.removeAllListeners("tas-tool-request-load");
+        ipcRenderer.on("tas-tool-request-load", ((evt, ...args) => cb(...args)));
+    },
+    offTasToolRequestLoad: () => ipcRenderer.removeAllListeners("tas-tool-request-load"),
     tasToolHistoryUpdate: data => ipcRenderer.send("tas-tool-history-update", data),
     tasToolSaveToFile: text => ipcRenderer.invoke("tas-tool-save-to-file", text),
     tasToolLoadFromFile: () => ipcRenderer.invoke("tas-tool-load-from-file"),
@@ -51,6 +59,10 @@ contextBridge.exposeInMainWorld("electron", {
     onTasToolBruteforceCancel: cb => {
         ipcRenderer.removeAllListeners("tas-tool-bruteforce-cancel");
         ipcRenderer.on("tas-tool-bruteforce-cancel", ((evt, ...args) => cb(...args)));
+    },
+    offTasToolBruteforce: () => {
+        ipcRenderer.removeAllListeners("tas-tool-bruteforce-run");
+        ipcRenderer.removeAllListeners("tas-tool-bruteforce-cancel");
     },
     onTasToolBruteforceProgress: cb => ipcRenderer.on("tas-tool-bruteforce-progress", ((evt, ...args) => cb(...args))),
     onTasToolBruteforceResult: cb => ipcRenderer.on("tas-tool-bruteforce-result", ((evt, ...args) => cb(...args))),
@@ -74,6 +86,11 @@ contextBridge.exposeInMainWorld("electron", {
     onTasToolDriveRate: cb => {
         ipcRenderer.removeAllListeners("tas-tool-drive-rate");
         ipcRenderer.on("tas-tool-drive-rate", ((evt, ...args) => cb(...args)));
+    },
+    offTasToolDrive: () => {
+        ipcRenderer.removeAllListeners("tas-tool-drive-start");
+        ipcRenderer.removeAllListeners("tas-tool-drive-stop");
+        ipcRenderer.removeAllListeners("tas-tool-drive-rate");
     },
     onTasToolDriveStatus: cb => ipcRenderer.on("tas-tool-drive-status", ((evt, ...args) => cb(...args))),
     tasToolSlowMoRate: payload => ipcRenderer.send("tas-tool-slowmo-rate", payload || {}),

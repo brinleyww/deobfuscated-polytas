@@ -1,41 +1,46 @@
 "use strict";
 (self.webpackChunk = self.webpackChunk || []).push([
-    [168], {
-        1168: (e, t, n) => {
-            n.d(t, {
-                AppWeb: () => s
+    [789], {
+        3789: (t, e, i) => {
+            i.d(e, {
+                HapticsWeb: () => r
             });
-            var i = n(6546);
-            class s extends i.E_ {
+            var a = i(6546),
+                n = i(3693);
+            class r extends a.E_ {
                 constructor() {
-                    super(), this.handleVisibilityChange = () => {
-                        const e = {
-                            isActive: !0 !== document.hidden
-                        };
-                        this.notifyListeners("appStateChange", e), document.hidden ? this.notifyListeners("pause", null) : this.notifyListeners("resume", null)
-                    }, document.addEventListener("visibilitychange", this.handleVisibilityChange, !1)
+                    super(...arguments), this.selectionStarted = !1
                 }
-                exitApp() {
-                    throw this.unimplemented("Not implemented on web.")
+                async impact(t) {
+                    const e = this.patternForImpact(null == t ? void 0 : t.style);
+                    this.vibrateWithPattern(e)
                 }
-                async getInfo() {
-                    throw this.unimplemented("Not implemented on web.")
+                async notification(t) {
+                    const e = this.patternForNotification(null == t ? void 0 : t.type);
+                    this.vibrateWithPattern(e)
                 }
-                async getLaunchUrl() {
-                    return {
-                        url: ""
-                    }
+                async vibrate(t) {
+                    const e = (null == t ? void 0 : t.duration) || 300;
+                    this.vibrateWithPattern([e])
                 }
-                async getState() {
-                    return {
-                        isActive: !0 !== document.hidden
-                    }
+                async selectionStart() {
+                    this.selectionStarted = !0
                 }
-                async minimizeApp() {
-                    throw this.unimplemented("Not implemented on web.")
+                async selectionChanged() {
+                    this.selectionStarted && this.vibrateWithPattern([70])
                 }
-                async toggleBackButtonHandler() {
-                    throw this.unimplemented("Not implemented on web.")
+                async selectionEnd() {
+                    this.selectionStarted = !1
+                }
+                patternForImpact(t = n.k.Heavy) {
+                    return t === n.k.Medium ? [43] : t === n.k.Light ? [20] : [61]
+                }
+                patternForNotification(t = n._.Success) {
+                    return t === n._.Warning ? [30, 40, 30, 50, 60] : t === n._.Error ? [27, 45, 50] : [35, 65, 21]
+                }
+                vibrateWithPattern(t) {
+                    if (!navigator.vibrate) throw this.unavailable("Browser does not support the vibrate API");
+                    navigator.vibrate(t)
                 }
             }
         }

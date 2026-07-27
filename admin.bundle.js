@@ -1,303 +1,167 @@
 "use strict";
 (self.webpackChunk = self.webpackChunk || []).push([
-    [142], {
-        5142: (e, t, n) => {
-            n.d(t, {
-                default: () => ce
+    [657], {
+        2657: (t, e, n) => {
+            n.d(e, {
+                default: () => L
             });
-            var i = n(1635),
-                s = n(927),
-                a = n(6633),
-                r = n(1223),
-                o = n(8438),
+            var a = n(1635),
+                i = n(1312),
                 d = n(5072),
-                l = n.n(d),
-                h = n(7825),
-                g = n.n(h),
-                f = n(7659),
-                c = n.n(f),
-                m = n(5056),
-                u = n.n(m),
-                p = n(540),
-                w = n.n(p),
-                v = n(1113),
-                x = n.n(v),
-                G = n(5467),
-                k = {};
-            k.styleTagTransform = x(), k.setAttributes = u(), k.insert = c().bind(null, "head"), k.domAPI = g(), k.insertStyleElement = w();
-            l()(G.A, k);
-            G.A && G.A.locals && G.A.locals;
-            var M, R, C, W, S, y, b;
-            M = new WeakMap, R = new WeakMap, C = new WeakMap, W = new WeakMap, S = new WeakMap, y = new WeakMap, b = new WeakMap;
+                o = n.n(d),
+                l = n(7825),
+                r = n.n(l),
+                c = n(7659),
+                s = n.n(c),
+                p = n(5056),
+                u = n.n(p),
+                m = n(540),
+                h = n.n(m),
+                f = n(1113),
+                b = n.n(f),
+                v = n(5768),
+                C = {};
+            C.styleTagTransform = b(), C.setAttributes = u(), C.insert = s().bind(null, "head"), C.domAPI = r(), C.insertStyleElement = h();
+            o()(v.A, C);
+            v.A && v.A.locals && v.A.locals;
+            var x, g, k, w = n(8583);
+            x = new WeakMap, g = new WeakMap, k = new WeakMap;
             const E = class {
-                constructor(e, t, n, a, r, o) {
-                    M.set(this, void 0), R.set(this, void 0), C.set(this, void 0), W.set(this, void 0), S.set(this, void 0), y.set(this, void 0), b.set(this, new Map);
-                    const d = document.getElementById("ui");
-                    if (null == d) throw new Error("UI element not found");
-                    (0, i.GG)(this, M, d, "f"), (0, i.GG)(this, R, document.createElement("div"), "f"), (0, i.gn)(this, R, "f").className = "verifier-ui", (0, i.gn)(this, M, "f").appendChild((0, i.gn)(this, R, "f")), (0, i.GG)(this, C, document.createElement("p"), "f"), (0, i.gn)(this, R, "f").appendChild((0, i.gn)(this, C, "f"));
-                    const l = document.createElement("p");
-                    l.textContent = "Number of threads: " + t.toString(), (0, i.gn)(this, R, "f").appendChild(l);
-                    const h = document.createElement("input");
-                    h.type = "range", h.min = "0", h.max = t.toString(), h.value = t.toString(), h.addEventListener("change", (() => {
-                        const e = parseInt(h.value, 10);
-                        l.textContent = "Number of threads: " + e.toString(), r(e)
-                    })), (0, i.gn)(this, R, "f").appendChild(h);
-                    const g = document.createElement("p");
-                    g.textContent = "Max time: " + Math.floor(n / 60 / 1e3).toString() + " minutes", (0, i.gn)(this, R, "f").appendChild(g);
-                    const f = document.createElement("input");
-                    f.type = "range", f.min = 6e4.toString(), f.max = s.A.maxFrames.toString(), f.value = n.toString(), f.addEventListener("input", (() => {
-                        const e = parseInt(f.value, 10);
-                        g.textContent = "Max time: " + Math.floor(e / 60 / 1e3).toString() + " minutes", o(e)
-                    })), (0, i.gn)(this, R, "f").appendChild(f);
-                    const c = document.createElement("table");
-                    (0, i.gn)(this, R, "f").appendChild(c), (0, i.GG)(this, W, c.createTHead(), "f"), (0, i.GG)(this, S, c.createTBody(), "f");
-                    const m = (0, i.gn)(this, W, "f").insertRow();
-                    for (const e of ["Track", "State", "Verified", "Invalid", "Estimated remaining"]) {
-                        const t = document.createElement("th");
-                        t.textContent = e, m.appendChild(t)
+                constructor(t, e, n, d, o, l) {
+                    x.set(this, void 0), g.set(this, void 0), k.set(this, void 0);
+                    const r = (0, i.sha256)(o),
+                        c = document.getElementById("ui");
+                    if (null == c) throw new Error("UI element not found");
+                    (0, a.GG)(this, x, c, "f"), (0, a.GG)(this, g, document.createElement("div"), "f"), (0, a.gn)(this, g, "f").className = "admin-ui", (0, a.gn)(this, x, "f").appendChild((0, a.gn)(this, g, "f"));
+                    const s = document.createElement("div");
+                    s.className = "tracks-list", (0, a.gn)(this, g, "f").appendChild(s);
+                    let p = null,
+                        u = 1;
+                    async function m(n, a) {
+                        p = n, u = a, E.value = a.toString(), b.innerHTML = "";
+                        const i = document.createElement("tr");
+                        b.appendChild(i);
+                        const l = document.createElement("th");
+                        l.textContent = "Name", i.appendChild(l);
+                        const c = document.createElement("th");
+                        c.textContent = "Frames", i.appendChild(c);
+                        const s = document.createElement("th");
+                        s.textContent = "Verified State", i.appendChild(s);
+                        const h = document.createElement("th");
+                        h.textContent = "Action", i.appendChild(h);
+                        let f = [];
+                        if (null != n) try {
+                            f = (await d.getLeaderboard(r, n, 20 * (a - 1), 20, !1)).entries
+                        } catch {}
+                        for (let i = 0; i < 20; i++) {
+                            const l = document.createElement("tr");
+                            if (b.appendChild(l), f.length > i) {
+                                const r = f[i],
+                                    c = document.createElement("td");
+                                c.textContent = r.nickname, l.appendChild(c);
+                                const s = document.createElement("td");
+                                s.textContent = r.frames.numberOfFrames.toString(), l.appendChild(s);
+                                const p = document.createElement("td");
+                                switch (r.verifiedState) {
+                                    case w.Y.Pending:
+                                        p.textContent = "Pending";
+                                        break;
+                                    case w.Y.Verified:
+                                        p.textContent = "Verified";
+                                        break;
+                                    case w.Y.Invalid:
+                                        p.textContent = "Invalid";
+                                        break;
+                                    case w.Y.InvalidDuplicate:
+                                        p.textContent = "Invalid Duplicate";
+                                        break;
+                                    case w.Y.InvalidManual:
+                                        p.textContent = "Invalid Manual";
+                                        break;
+                                    default:
+                                        p.textContent = "Unknown"
+                                }
+                                l.appendChild(p);
+                                const u = document.createElement("td"),
+                                    h = document.createElement("button");
+                                h.className = "button", h.textContent = "Invalidate", h.addEventListener("click", (() => {
+                                    t.playUIClick(), e.showConfirm('Are you sure you want to invalidate "' + r.nickname + "\"'s leaderboard entry?", "Cancel", "Invalidate", null, (() => {
+                                        d.verifyRecordings(o, null, 1, !1, [{
+                                            id: r.id,
+                                            verifiedState: w.Y.InvalidManual
+                                        }]).then((() => {
+                                            m(n, a)
+                                        })).catch((() => {
+                                            e.show("Failed to invalidate entry", "Ok", null)
+                                        }))
+                                    }))
+                                })), u.appendChild(h), l.appendChild(u)
+                            } else l.appendChild(document.createElement("td")), l.appendChild(document.createElement("td")), l.appendChild(document.createElement("td")), l.appendChild(document.createElement("td"))
+                        }
                     }
-                    const u = document.createElement("button");
-                    u.className = "button", u.textContent = "Stop", u.addEventListener("click", (() => {
-                        e.playUIClick(), a()
-                    })), (0, i.gn)(this, R, "f").appendChild(u), window.addEventListener("keydown", (0, i.GG)(this, y, (e => {
-                        "Escape" == e.code && (a(), e.preventDefault())
+                    const h = [];
+                    n.forEachTrack(((e, n) => {
+                        const a = document.createElement("button");
+                        a.className = "button", a.textContent = n.name, a.addEventListener("click", (() => {
+                            t.playUIClick();
+                            for (const t of h) t.classList.remove("selected");
+                            a.classList.add("selected"), m(e, 1)
+                        })), s.appendChild(a), h.push(a)
+                    }));
+                    const f = document.createElement("div");
+                    f.className = "leaderboard-container", (0, a.gn)(this, g, "f").appendChild(f);
+                    const b = document.createElement("table");
+                    f.appendChild(b);
+                    const v = document.createElement("div");
+                    v.className = "navigation", f.appendChild(v);
+                    const C = document.createElement("button");
+                    C.className = "button", C.textContent = "<", C.addEventListener("click", (() => {
+                        t.playUIClick(), null != p && m(p, Math.max(1, u - 1))
+                    })), v.appendChild(C);
+                    const E = document.createElement("input");
+                    E.type = "text", E.min = "1", E.value = "1", E.addEventListener("change", (() => {
+                        const t = parseInt(E.value, 10);
+                        null != p && Number.isSafeInteger(t) && t >= 1 && m(p, t)
+                    })), v.appendChild(E);
+                    const y = document.createElement("button");
+                    y.className = "button", y.textContent = ">", y.addEventListener("click", (() => {
+                        t.playUIClick(), null != p && m(p, u + 1)
+                    })), v.appendChild(y), m(null, 1);
+                    const I = document.createElement("button");
+                    I.className = "button", I.textContent = "Quit", I.addEventListener("click", (() => {
+                        t.playUIClick(), l()
+                    })), (0, a.gn)(this, g, "f").appendChild(I), window.addEventListener("keydown", (0, a.GG)(this, k, (t => {
+                        "Escape" == t.code && (l(), t.preventDefault())
                     }), "f"))
                 }
                 dispose() {
-                    (0, i.gn)(this, M, "f").removeChild((0, i.gn)(this, R, "f")), window.removeEventListener("keydown", (0, i.gn)(this, y, "f"))
-                }
-                setText(e) {
-                    (0, i.gn)(this, C, "f").textContent = e
-                }
-                setTracks(e) {
-                    for (const t of e) {
-                        let e = (0, i.gn)(this, b, "f").get(t.id);
-                        if (null == e) {
-                            e = {
-                                element: (0, i.gn)(this, S, "f").insertRow(),
-                                name: t.name,
-                                exhausted: t.exhausted,
-                                recordingsVerified: t.recordingsVerified,
-                                invalidRecordings: t.invalidRecordings,
-                                estimatedRemaining: t.estimatedRemaining
-                            }, (0, i.gn)(this, b, "f").set(t.id, e);
-                            e.element.insertCell().textContent = t.name;
-                            e.element.insertCell().textContent = t.exhausted ? "Empty" : "Processing";
-                            e.element.insertCell().textContent = t.recordingsVerified.toString();
-                            e.element.insertCell().textContent = t.invalidRecordings.toString();
-                            const n = e.element.insertCell();
-                            null != t.estimatedRemaining ? n.textContent = t.estimatedRemaining.toString() : n.textContent = "?"
-                        } else e.name != t.name && (e.element.cells[0].textContent = t.name, e.name = t.name), e.exhausted != t.exhausted && (e.element.cells[1].textContent = t.exhausted ? "Empty" : "Processing", e.exhausted = t.exhausted), e.recordingsVerified != t.recordingsVerified && (e.element.cells[2].textContent = t.recordingsVerified.toString(), e.recordingsVerified = t.recordingsVerified), e.invalidRecordings != t.invalidRecordings && (e.element.cells[3].textContent = t.invalidRecordings.toString(), e.invalidRecordings = t.invalidRecordings), e.estimatedRemaining != t.estimatedRemaining && (null != t.estimatedRemaining ? e.element.cells[4].textContent = t.estimatedRemaining.toString() : e.element.cells[4].textContent = "?", e.estimatedRemaining = t.estimatedRemaining)
-                    }
+                    (0, a.gn)(this, x, "f").removeChild((0, a.gn)(this, g, "f")), window.removeEventListener("keydown", (0, a.gn)(this, k, "f"))
                 }
             };
-            var T, V, D, I, A, F, B, L, P, N, U, z, Y, O, H, j, q, J, K, Q, X, Z, $, _, ee, te, ne, ie, se, ae, re, oe, de, le, he = n(2951),
-                ge = n(4784);
-            class fe {
-                constructor(e, t, n, a, o, d, l, h, g) {
-                    T.add(this), D.set(this, void 0), I.set(this, void 0), A.set(this, void 0), F.set(this, void 0), B.set(this, void 0), L.set(this, void 0), P.set(this, void 0), N.set(this, []), U.set(this, []), z.set(this, []), Y.set(this, !1), O.set(this, new Date), H.set(this, []), j.set(this, !0), q.set(this, void 0), J.set(this, new Date), K.set(this, 0), Q.set(this, 0), X.set(this, 0), Z.set(this, 0), $.set(this, 100), _.set(this, 100), ee.set(this, 1e3), te.set(this, 36e5), ne.set(this, s.A.maxFrames), ie.set(this, 4), se.set(this, void 0), (0, i.GG)(this, D, e, "f"), (0, i.GG)(this, I, t, "f"), (0, i.GG)(this, A, n, "f"), (0, i.GG)(this, F, a, "f"), (0, i.GG)(this, B, l, "f"), (0, i.GG)(this, L, h, "f"), "undefined" != typeof navigator && "hardwareConcurrency" in navigator && navigator.hardwareConcurrency > 0 && (0, i.GG)(this, ie, navigator.hardwareConcurrency, "f"), (0, i.GG)(this, se, (0, i.gn)(this, ie, "f"), "f"), t.clear(), (0, i.GG)(this, P, new E(e, (0, i.gn)(this, ie, "f"), (0, i.gn)(this, ne, "f"), g, (e => {
-                        for ((0, i.GG)(this, se, e, "f");
-                            (0, i.gn)(this, N, "f").length < (0, i.gn)(this, se, "f");)(0, i.gn)(this, N, "f").push({
-                            simulation: new r.A(!1, d, l),
-                            isBusy: !1,
-                            isDisposed: !1
-                        });
-                        for (;
-                            (0, i.gn)(this, N, "f").length > (0, i.gn)(this, se, "f");) {
-                            const e = (0, i.gn)(this, N, "f").pop();
-                            null != e && (e.simulation.dispose(), e.isDisposed = !0)
-                        }
-                    }), (e => {
-                        (0, i.GG)(this, ne, e, "f");
-                        for (const e of (0, i.gn)(this, U, "f")) e.timeout = new Date, e.estimatedRemaining = null
-                    })), "f");
-                    for (let e = 0; e < (0, i.gn)(this, se, "f"); e++)(0, i.gn)(this, N, "f").push({
-                        simulation: new r.A(!1, d, (0, i.gn)(this, B, "f")),
-                        isBusy: !1,
-                        isDisposed: !1
-                    });
-                    if (o.forEachTrack(((e, t, n, s) => {
-                            (0, i.gn)(this, U, "f").push({
-                                id: e,
-                                name: t.name,
-                                trackData: s,
-                                timeout: new Date,
-                                recordingsVerified: 0,
-                                invalidRecordings: 0,
-                                estimatedRemaining: null,
-                                lastEstimatedRemainingTime: null
-                            })
-                        })), (0, i.GG)(this, q, setInterval((() => {
-                            (0, i.gn)(this, T, "m", oe).call(this)
-                        }), 10), "f"), window.electron) {
-                        const e = () => {
-                            if (window.electron) {
-                                const e = new Date,
-                                    t = "--- PolyTrack Verifier ---\n" + (0, i.gn)(this, T, "m", de).call(this, e);
-                                window.electron.log(t)
-                            }
-                        };
-                        setInterval(e, 1e4), e()
-                    }
+            var y, I, G;
+            y = new WeakMap, I = new WeakMap, G = new WeakMap;
+            const L = class {
+                constructor(t, e, n, i, d, o, l) {
+                    y.set(this, void 0), I.set(this, void 0), G.set(this, void 0), (0, a.GG)(this, y, t, "f"), (0, a.GG)(this, I, e, "f"), (0, a.GG)(this, G, new E(t, n, i, d, o, l), "f")
                 }
                 dispose() {
-                    (0, i.gn)(this, P, "f").dispose();
-                    for (const e of (0, i.gn)(this, N, "f")) e.simulation.dispose(), e.isDisposed = !0;
-                    (0, i.gn)(this, N, "f").length = 0, clearInterval((0, i.gn)(this, q, "f"))
+                    (0, a.gn)(this, G, "f").dispose()
                 }
-                update(e) {
-                    if ((0, i.gn)(this, B, "f").hasLoaded()) {
-                        const e = new Date;
-                        (0, i.gn)(this, P, "f").setText((0, i.gn)(this, T, "m", de).call(this, e)), (0, i.gn)(this, P, "f").setTracks((0, i.gn)(this, U, "f").map((({
-                            id: t,
-                            name: n,
-                            timeout: i,
-                            recordingsVerified: s,
-                            invalidRecordings: a,
-                            estimatedRemaining: r
-                        }) => ({
-                            id: t,
-                            name: n,
-                            exhausted: i > e,
-                            recordingsVerified: s,
-                            invalidRecordings: a,
-                            estimatedRemaining: r
-                        }))))
-                    }(0, i.gn)(this, D, "f").update(e, !1, (0, i.gn)(this, I, "f"))
+                update(t) {
+                    (0, a.gn)(this, y, "f").update(t, !1, (0, a.gn)(this, I, "f"))
                 }
             }
-            V = fe, D = new WeakMap, I = new WeakMap, A = new WeakMap, F = new WeakMap, B = new WeakMap, L = new WeakMap, P = new WeakMap, N = new WeakMap, U = new WeakMap, z = new WeakMap, Y = new WeakMap, O = new WeakMap, H = new WeakMap, j = new WeakMap, q = new WeakMap, J = new WeakMap, K = new WeakMap, Q = new WeakMap, X = new WeakMap, Z = new WeakMap, $ = new WeakMap, _ = new WeakMap, ee = new WeakMap, te = new WeakMap, ne = new WeakMap, ie = new WeakMap, se = new WeakMap, T = new WeakSet, ae = function(e) {
-                const t = (0, i.gn)(this, U, "f").slice();
-                do {
-                    const n = Math.floor(Math.random() * t.length),
-                        i = t.splice(n, 1)[0];
-                    if (e > i.timeout) return i
-                } while (t.length > 0);
-                return null
-            }, re = function() {
-                const e = new Date;
-                if (!(0, i.gn)(this, Y, "f") && (0, i.gn)(this, H, "f").length < (0, i.gn)(this, _, "f") && Math.abs(e.getTime() - (0, i.gn)(this, O, "f").getTime()) >= (0, i.gn)(this, ee, "f")) {
-                    (0, i.GG)(this, Y, !0, "f"), (0, i.GG)(this, O, e, "f");
-                    const t = (0, i.gn)(this, T, "m", ae).call(this, e);
-                    if (null != t || (0, i.gn)(this, z, "f").length > 0 && 0 == (0, i.gn)(this, H, "f").length || (0, i.gn)(this, z, "f").length > (0, i.gn)(this, $, "f")) {
-                        const n = (0, i.gn)(this, z, "f");
-                        (0, i.GG)(this, z, [], "f");
-                        const r = null != t && (null == t.lastEstimatedRemainingTime || Math.abs(e.getTime() - t.lastEstimatedRemainingTime.getTime()) >= (0, i.gn)(this, te, "f"));
-                        (0, i.gn)(this, A, "f").verifyRecordings((0, i.gn)(this, L, "f"), t?.id ?? null, (0, i.gn)(this, ne, "f"), r, n).then((({
-                            unverifiedRecordings: n,
-                            exhaustive: r,
-                            estimatedRemaining: o
-                        }) => {
-                            null != t && ((0, i.GG)(this, H, (0, i.gn)(this, H, "f").concat(n.map((({
-                                id: e,
-                                recording: n,
-                                frames: i
-                            }) => ({
-                                track: t,
-                                recordingId: e,
-                                recording: s.A.deserialize(n),
-                                time: new a.A(i)
-                            })))), "f"), r ? (t.timeout = new Date(e.getTime() + Math.floor(432e5 + 12 * Math.random() * 60 * 60 * 1e3)), t.estimatedRemaining = n.length, t.lastEstimatedRemainingTime = e) : null != o && (t.estimatedRemaining = o, t.lastEstimatedRemainingTime = e))
-                        })).catch((e => {
-                            console.error(e), (0, i.gn)(this, A, "f").getUser((0, i.gn)(this, L, "f")).then((e => {
-                                if (!e?.isVerifier) {
-                                    for (let e = 0; e < he.A.maxNumberOfProfiles; e++) {
-                                        const t = (0, i.gn)(this, F, "f").getUserProfile(e);
-                                        if (null != t && t.isVerifier && t.token == (0, i.gn)(this, L, "f")) {
-                                            (0, i.gn)(this, F, "f").setIsVerifier(!1, e);
-                                            break
-                                        }
-                                    }(0, i.GG)(this, j, !1, "f")
-                                }
-                            })).catch((e => {
-                                console.warn(e)
-                            }))
-                        })).finally((() => {
-                            (0, i.GG)(this, Y, !1, "f")
-                        }))
-                    } else(0, i.GG)(this, Y, !1, "f")
-                }
-            }, oe = async function() {
-                var e, t, n, s, a, r;
-                if ((0, i.gn)(this, B, "f").hasLoaded() && (0, i.gn)(this, j, "f")) {
-                    (0, i.gn)(this, T, "m", re).call(this);
-                    for (const d of (0, i.gn)(this, N, "f"))
-                        if (!d.isBusy && (0, i.gn)(this, H, "f").length > 0) {
-                            d.isBusy = !0;
-                            const {
-                                track: l,
-                                recordingId: h,
-                                recording: g,
-                                time: f
-                            } = (0, i.gn)(this, H, "f").splice(0, 1)[0];
-                            if (null == g)(0, i.GG)(this, Q, (e = (0, i.gn)(this, Q, "f"), ++e), "f"), l.recordingsVerified++, (0, i.GG)(this, X, (t = (0, i.gn)(this, X, "f"), ++t), "f"), l.invalidRecordings++, null != l.estimatedRemaining && (l.estimatedRemaining = Math.max(0, l.estimatedRemaining - 1), 0 == l.estimatedRemaining && (l.lastEstimatedRemainingTime = null)), (0, i.gn)(this, z, "f").push({
-                                id: h,
-                                verifiedState: ge.Y.Invalid
-                            }), d.isBusy = !1;
-                            else {
-                                let e;
-                                (0, i.GG)(this, K, (n = (0, i.gn)(this, K, "f"), ++n), "f");
-                                try {
-                                    l.trackData instanceof o.A ? e = l.trackData : (e = await l.trackData(), l.trackData = e)
-                                } catch (t) {
-                                    console.error('Failed to load track data for track "' + l.name + '":', t), e = null
-                                }
-                                try {
-                                    if (null != e) {
-                                        const t = await d.simulation.validate(e, g, f);
-                                        (0, i.GG)(this, Q, (s = (0, i.gn)(this, Q, "f"), ++s), "f"), l.recordingsVerified++, t || ((0, i.GG)(this, X, (a = (0, i.gn)(this, X, "f"), ++a), "f"), l.invalidRecordings++), null != l.estimatedRemaining && (l.estimatedRemaining = Math.max(0, l.estimatedRemaining - 1), 0 == l.estimatedRemaining && (l.lastEstimatedRemainingTime = null)), (0, i.GG)(this, Z, (0, i.gn)(this, Z, "f") + f.numberOfFrames, "f"), (0, i.gn)(this, z, "f").push({
-                                            id: h,
-                                            verifiedState: t ? ge.Y.Verified : ge.Y.Invalid
-                                        })
-                                    }
-                                } catch (e) {
-                                    if (!d.isDisposed) throw e
-                                } finally {
-                                    d.isBusy = !1, (0, i.GG)(this, K, (r = (0, i.gn)(this, K, "f"), --r), "f")
-                                }
-                            }
-                        }
-                }
-            }, de = function(e) {
-                const t = (e.getTime() - (0, i.gn)(this, J, "f").getTime()) / 1e3;
-                let n = "";
-                (0, i.gn)(this, j, "f") ? n += "Recordings are being verified...\n": n += "Error: User is no longer a verifier\n", n += "\nBacklog: " + (0, i.gn)(this, H, "f").length.toString(), n += "\nProcessing: " + (0, i.gn)(this, K, "f").toString(), n += "\nRecordings verified: " + (0, i.gn)(this, Q, "f").toString(), n += "\nInvalid recordings found: " + (0, i.gn)(this, X, "f").toString(), n += "\n";
-                const s = (0, i.gn)(this, Q, "f") / t;
-                n += "\nVerifications per second: " + s.toFixed(2), n += "\nSimulated frames per second: " + Math.floor((0, i.gn)(this, Z, "f") / t).toString(), n += "\n";
-                const a = (0, i.gn)(this, U, "f").reduce(((e, t) => null != t.estimatedRemaining ? e + t.estimatedRemaining : e), 0);
-                return n += "\nTotal estimated remaining: " + a.toString(), n += "\nTotal estimated remaining time: " + (0, i.gn)(V, V, "m", le).call(V, a / s), n
-            }, le = function(e) {
-                if (e <= 0 || !Number.isFinite(e)) return "0s";
-                if (e < 60) return e.toFixed(0) + "s";
-                if (e < 3600) {
-                    const t = e % 60;
-                    return Math.floor(e / 60).toString() + "m " + t.toFixed(0) + "s"
-                }
-                if (e < 86400) {
-                    const t = Math.floor(e / 3600),
-                        n = Math.floor(e % 3600 / 60),
-                        i = e % 60;
-                    return t.toString() + "h " + n.toString() + "m " + i.toFixed(0) + "s"
-                } {
-                    const t = Math.floor(e / 86400),
-                        n = Math.floor(e % 86400 / 3600),
-                        i = Math.floor(e % 3600 / 60),
-                        s = e % 60;
-                    return t.toString() + "d " + n.toString() + "h " + i.toString() + "m " + s.toFixed(0) + "s"
-                }
-            };
-            const ce = fe
         },
-        5467: (e, t, n) => {
-            n.d(t, {
-                A: () => o
+        5768: (t, e, n) => {
+            n.d(e, {
+                A: () => l
             });
-            var i = n(1601),
-                s = n.n(i),
-                a = n(6314),
-                r = n.n(a)()(s());
-            r.push([e.id, '.verifier-ui {\n\tposition: absolute;\n\tleft: 0;\n\ttop: 0;\n\tz-index: 2;\n\tmargin: 0;\n\tpadding: 16px;\n\twidth: 100%;\n\theight: 100%;\n\toverflow-y: scroll;\n\tbox-sizing: border-box;\n\tbackground-color: var(--surface-color);\n\tpointer-events: auto;\n}\n\n.verifier-ui > p {\n\tmargin: 16px 4px 0 4px;\n\tpadding: 0;\n\tfont-size: 20px;\n\tcolor: var(--text-color);\n\twhite-space: pre-wrap;\n}\n\n.verifier-ui > input[type="range"] {\n\tmargin: 16px 0;\n\twidth: 390px;\n}\n\n.verifier-ui > table {\n\tmargin: 0;\n\tpadding: 0;\n\twidth: 100%;\n\tborder-collapse: collapse;\n\ttable-layout: fixed;\n\tcolor: var(--text-color);\n}\n\n.verifier-ui > table > thead > tr > th {\n\ttext-align: left;\n\tborder-bottom: 2px solid var(--text-color);\n}\n\n.verifier-ui > table > thead > tr > th, .verifier-ui > table > tbody > tr > td {\n\tpadding: 8px 0;\n\toverflow: hidden;\n\ttext-overflow: ellipsis;\n\twhite-space: nowrap;\n}\n\n.verifier-ui > button {\n\tdisplay: inline-block;\n\tmargin: 16px 0 0 0;\n}\n', ""]);
-            const o = r
+            var a = n(1601),
+                i = n.n(a),
+                d = n(6314),
+                o = n.n(d)()(i());
+            o.push([t.id, ".admin-ui {\n\tposition: absolute;\n\tleft: 0;\n\ttop: 0;\n\tz-index: 2;\n\tmargin: 0;\n\tpadding: 16px;\n\twidth: 100%;\n\theight: 100%;\n\toverflow-y: scroll;\n\tbox-sizing: border-box;\n\tbackground-color: var(--surface-color);\n\tpointer-events: auto;\n}\n\n.admin-ui > .tracks-list {\n\tdisplay: flex;\n\tflex-wrap: wrap;\n}\n\n.admin-ui > .tracks-list > button {\n\tmargin: 4px;\n\twidth: 300px;\n\toverflow: hidden;\n\ttext-overflow: ellipsis;\n\twhite-space: nowrap;\n}\n.admin-ui > .tracks-list > button.selected {\n\tbackground-color: var(--button-hover-color);\n}\n\n.admin-ui > .leaderboard-container {\n\twidth: 100%;\n}\n\n.admin-ui > .leaderboard-container > table {\n\ttable-layout: fixed;\n\tborder-collapse: collapse;\n\tcolor: var(--text-color);\n\tfont-size: 26px;\n\twidth: 100%;\n}\n.admin-ui > .leaderboard-container > table > tr > th {\n\tborder-bottom: 2px solid var(--text-color);\n\ttext-align: left;\n}\n\n.admin-ui > .leaderboard-container > table > tr > th:nth-of-type(2) {\n\twidth: 150px;\n}\n\n.admin-ui > .leaderboard-container > table > tr > th:nth-of-type(3) {\n\twidth: 220px;\n}\n\n.admin-ui > .leaderboard-container > table > tr > th:nth-of-type(4) {\n\twidth: 200px;\n}\n\n.admin-ui > .leaderboard-container > table > tr > td {\n\theight: 60px;\n}\n\n.admin-ui > .leaderboard-container > table > tr:nth-of-type(2n + 1) > td {\n\tbackground-color: var(--surface-secondary-color);\n}\n\n.admin-ui > .leaderboard-container > .navigation {\n\tdisplay: flex;\n\tmargin: 8px 0;\n}\n.admin-ui > .leaderboard-container > .navigation > input {\n\tflex-grow: 1;\n\ttext-align: center;\n}", ""]);
+            const l = o
         }
     }
 ]);

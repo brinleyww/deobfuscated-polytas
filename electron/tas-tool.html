@@ -1,12 +1,10 @@
 <!doctype html>
 <html>
-
 <head>
     <meta charset="utf-8">
     <title>TAS Tool</title>
     <link rel="stylesheet" href="tas-tool.css">
 </head>
-
 <body>
     <header>
         <h1 style="margin:0;font-weight:600;font-size:16px">TAS Tool</h1>
@@ -175,6 +173,11 @@
         window.addEventListener("DOMContentLoaded", function() {
             setVal(window.__tasEncoded || "");
             setHuman(window.__tasDecoded || "");
+            window.electron.onTasToolEncodedUpdate(function(encoded) {
+                try {
+                    setVal(encoded || "");
+                } catch (e) {}
+            });
             window.electron.onTasToolGhostsUpdate(function(payload) {
                 try {
                     renderGhosts(payload)
@@ -1774,6 +1777,12 @@
                 var driveRow = el("div", {
                     style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px;border:1px solid #242435;border-radius:7px;background:#0d0d14;"
                 });
+                var savedDriveSpeed = 25;
+                try {
+                    var storedDriveSpeedRaw = localStorage.getItem("polytrackTasDriveSlowmoPercent");
+                    var storedDriveSpeed = Number(storedDriveSpeedRaw);
+                    if (storedDriveSpeedRaw != null && isFinite(storedDriveSpeed)) savedDriveSpeed = Math.max(5, Math.min(100, Math.round(storedDriveSpeed / 5) * 5));
+                } catch (e) {}
                 var driveSpeedWrap = el("label", {
                     style: "display:flex;flex-direction:column;gap:4px;font-size:11px;color:#bbb;min-width:260px;"
                 });
@@ -1784,7 +1793,7 @@
                 var driveSpeedOut = el("strong", {
                     id: "tas-drive-speed-value",
                     style: "color:#ddd;font-variant-numeric:tabular-nums;"
-                }, "25%");
+                }, savedDriveSpeed + "%");
                 driveSpeedHead.appendChild(driveSpeedOut);
                 driveSpeedWrap.appendChild(driveSpeedHead);
                 var driveSpeed = el("input", {
@@ -1793,11 +1802,18 @@
                     min: "5",
                     max: "100",
                     step: "5",
-                    value: "25",
+                    value: String(savedDriveSpeed),
+                    title: "Simulation speed while you drive from the TAS endpoint. This is isolated from the normal game-speed setting.",
                     style: "width:260px;"
                 });
                 driveSpeedWrap.appendChild(driveSpeed);
                 driveRow.appendChild(driveSpeedWrap);
+                var driveNormalBtn = el("button", {
+                    type: "button",
+                    title: "Set live driving to normal speed",
+                    style: "padding:5px 8px;font-size:11px;"
+                }, "100% speed");
+                driveRow.appendChild(driveNormalBtn);
                 var driveStartBtn = el("button", {
                     id: "tas-drive-start",
                     title: "Replay the TAS to its final input frame, focus the game window, then take control. Press F8 in-game to stop and keep inputs."
@@ -2009,6 +2025,43 @@
 
                 controls.insertBefore(panel, controls.firstChild);
 
+                // Keep search tuning between editor sessions; these values are tedious to re-enter.
+                var bfPreferenceIds = [
+                    "bf-start", "bf-finish", "bf-step", "bf-hold", "bf-max-changes",
+                    "bf-max-time-diff", "bf-eval", "bf-concurrency", "bf-keysets",
+                    "bf-mutation-mode", "bf-objective", "bf-target-x", "bf-target-y",
+                    "bf-target-z", "bf-distance-weight", "bf-lis-weight"
+                ];
+
+                function saveBruteforcePreferences() {
+                    try {
+                        var values = {};
+                        bfPreferenceIds.forEach(function(id) {
+                            var node = $(id);
+                            if (node) values[id] = node.value;
+                        });
+                        localStorage.setItem("polytrackTasBruteforcePreferencesV1", JSON.stringify(values));
+                    } catch (e) {}
+                }
+                try {
+                    var savedBruteforcePreferences = JSON.parse(localStorage.getItem("polytrackTasBruteforcePreferencesV1") || "null");
+                    if (savedBruteforcePreferences && typeof savedBruteforcePreferences === "object") {
+                        bfPreferenceIds.forEach(function(id) {
+                            var node = $(id),
+                                value = savedBruteforcePreferences[id];
+                            if (node && value != null) node.value = String(value);
+                        });
+                    }
+                } catch (e) {}
+                bfPreferenceIds.forEach(function(id) {
+                    var node = $(id);
+                    if (!node) return;
+                    node.addEventListener("input", saveBruteforcePreferences);
+                    node.addEventListener("change", saveBruteforcePreferences);
+                });
+                distanceWeightSlider.dispatchEvent(new Event("input"));
+                lisWeightSlider.dispatchEvent(new Event("input"));
+
                 function normalizeKeys(str) {
                     var order = ["w", "a", "s", "d", "r"],
                         set = new Set();
@@ -2193,6 +2246,58 @@
                     return (best.label || ("#" + best.index)) + " | score " + Number(best.score || 0).toFixed(3) + (best.selectionScore != null && Math.abs(Number(best.selectionScore) - Number(best.score || 0)) > 1e-9 ? (" | combined " + Number(best.selectionScore).toFixed(3)) : "") + (best.inputCount != null ? (" | inputs " + best.inputCount) : "") + " | cp " + (st.nextCheckpointIndex != null ? st.nextCheckpointIndex : "?") + " | speed " + (st.speedKmh != null ? Number(st.speedKmh).toFixed(2) : "?") + " km/h" + (st.distanceToTarget != null ? (" | target " + Number(st.distanceToTarget).toFixed(2) + " m") : "");
                 }
 
+                function preserveTasAnnotations(originalText, candidateText) {
+                    try {
+                        var commentsByFrame = new Map(),
+                            unattached = [],
+                            currentFrame = null;
+                        String(originalText || "").split("\n").forEach(function(line) {
+                            var hash = line.indexOf("#");
+                            var code = (hash >= 0 ? line.slice(0, hash) : line).trim();
+                            var frame = parseInt(code.split(",")[0], 10);
+                            if (!isNaN(frame) && code.indexOf(",") >= 0) currentFrame = frame;
+                            if (hash >= 0) {
+                                var comment = line.slice(hash).trim();
+                                if (comment) {
+                                    if (currentFrame == null) unattached.push(comment);
+                                    else {
+                                        if (!commentsByFrame.has(currentFrame)) commentsByFrame.set(currentFrame, []);
+                                        commentsByFrame.get(currentFrame).push(comment);
+                                    }
+                                }
+                            } else if (/^(tap|hold|shift)\s+/i.test(code)) {
+                                if (currentFrame == null) unattached.push("# " + code);
+                                else {
+                                    if (!commentsByFrame.has(currentFrame)) commentsByFrame.set(currentFrame, []);
+                                    commentsByFrame.get(currentFrame).push("# " + code);
+                                }
+                            }
+                        });
+                        var emitted = new Set(),
+                            output = unattached.slice();
+                        String(candidateText || "").split("\n").forEach(function(line) {
+                            var frame = parseInt(line.split(",")[0], 10);
+                            var annotations = commentsByFrame.get(frame);
+                            if (annotations && annotations.length) {
+                                output.push(line + " " + annotations[0]);
+                                for (var i = 1; i < annotations.length; i++) output.push(annotations[i]);
+                                emitted.add(frame);
+                            } else output.push(line);
+                        });
+                        commentsByFrame.forEach(function(annotations, frame) {
+                            if (!emitted.has(frame)) {
+                                output.push("# From original frame " + frame);
+                                annotations.forEach(function(annotation) {
+                                    output.push(annotation);
+                                });
+                            }
+                        });
+                        return output.join("\n");
+                    } catch (e) {
+                        return candidateText;
+                    }
+                }
+
                 try {
                     var sf = selectedLineFrame();
                     if (sf != null && $("bf-start")) {
@@ -2332,7 +2437,11 @@
                         };
                     }
 
-                    var timingTarget = timingOnly ? requestedChanges : ((!inputOnly && session.maxTimeDifference > 0) ? 1 : 0);
+                    var timingTarget = timingOnly ?
+                        requestedChanges :
+                        ((!inputOnly && session.maxTimeDifference > 0) ?
+                            (requestedChanges === 1 ? candidateIndex % 2 : 1) :
+                            0);
                     var inputTarget = timingOnly ? 0 : Math.max(0, requestedChanges - timingTarget);
 
                     // Preserve the previous exhaustive one-input search when timing mutation is disabled.
@@ -2502,6 +2611,11 @@
                         var maxTimeDifference = readInt("bf-max-time-diff", 5, 0, 100000);
                         var mutationMode = ($("bf-mutation-mode") && $("bf-mutation-mode").value) || "inputs_timing";
                         var evalFrame = readInt("bf-eval", finish + holdSpec.max + maxTimeDifference + 60, 1, 999999);
+                        var minimumEvalFrame = Math.min(999999, finish + holdSpec.max + maxTimeDifference + 1);
+                        if (evalFrame < minimumEvalFrame) {
+                            evalFrame = minimumEvalFrame;
+                            if ($("bf-eval")) $("bf-eval").value = String(evalFrame);
+                        }
                         var batchSize = readInt("bf-concurrency", 48, 1, 128);
                         var distanceWeight = readInt("bf-distance-weight", 50, 0, 100) / 100;
                         var lisWeight = readInt("bf-lis-weight", 50, 0, 100) / 100;
@@ -2529,6 +2643,7 @@
                             status.textContent = "Timing-only mode requires Max time difference to be at least 1.";
                             return;
                         }
+                        saveBruteforcePreferences();
 
                         bfSession = {
                             running: true,
@@ -2578,8 +2693,9 @@
                 applyBestBtn.addEventListener("click", function() {
                     try {
                         if (!lastBest || !lastBest.text) return;
-                        setHuman(lastBest.text);
-                        status.textContent = "Best candidate applied to editor. Click Apply to send it to the game ghost.";
+                        var annotated = preserveTasAnnotations(($('decoded') && $('decoded').value) || "", lastBest.text);
+                        setHuman(annotated);
+                        status.textContent = "Best candidate applied; comments and bookmarks were retained. Click Apply to send it to the game ghost.";
                     } catch (e) {}
                 });
 
@@ -2660,13 +2776,17 @@
                     driveSpeedOut.textContent = driveSpeed.value + "%";
                     try {
                         var rate = Math.max(.05, Number(driveSpeed.value) / 100);
-                        window.electron.tasToolSlowMoRate({
-                            rate: rate
-                        });
+                        localStorage.setItem("polytrackTasDriveSlowmoPercent", String(driveSpeed.value));
                         window.electron.tasToolDriveRate({
                             rate: rate
                         });
                     } catch (e) {}
+                });
+                driveNormalBtn.addEventListener("click", function() {
+                    driveSpeed.value = "100";
+                    driveSpeed.dispatchEvent(new Event("input", {
+                        bubbles: true
+                    }));
                 });
                 driveStartBtn.addEventListener("click", function() {
                     try {
@@ -2719,12 +2839,18 @@
                         } else if (info.status === "received") driveReadout.textContent = "Replay screen received drive mode. Preparing the simulation…";
                         else if (info.status === "preroll") driveReadout.textContent = "Fast-forwarding to frame " + (info.takeoverFrame != null ? info.takeoverFrame : "…") + "… the game window has keyboard focus.";
                         else if (info.status === "driving") {
+                            var activeRate = Math.round((Number(info.rate) || Number(driveSpeed.value) / 100) * 100);
+                            driveSpeed.value = String(activeRate);
+                            driveSpeedOut.textContent = activeRate + "%";
                             driveStartBtn.disabled = true;
                             driveStopBtn.disabled = false;
                             driveDiscardBtn.disabled = false;
-                            driveReadout.textContent = "Driving at " + Math.round((Number(info.rate) || Number(driveSpeed.value) / 100) * 100) + "% — " + driveHotkeyText() + " from the TAS endpoint.";
+                            driveReadout.textContent = "Driving at " + activeRate + "% isolated simulation speed — " + driveHotkeyText() + " from the TAS endpoint.";
                         } else if (info.status === "rate") {
-                            driveReadout.textContent = "Driving at " + Math.round((Number(info.rate) || Number(driveSpeed.value) / 100) * 100) + "% — " + driveHotkeyText() + " from the TAS endpoint.";
+                            var updatedRate = Math.round((Number(info.rate) || Number(driveSpeed.value) / 100) * 100);
+                            driveSpeed.value = String(updatedRate);
+                            driveSpeedOut.textContent = updatedRate + "%";
+                            driveReadout.textContent = "Driving at " + updatedRate + "% isolated simulation speed — " + driveHotkeyText() + " from the TAS endpoint.";
                         } else if (info.status === "stopped") {
                             driveStartBtn.disabled = false;
                             driveStopBtn.disabled = true;
@@ -2818,5 +2944,4 @@
     </script>
 
 </body>
-
 </html>

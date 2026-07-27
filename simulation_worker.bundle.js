@@ -11,7 +11,9 @@
         PauseCar: 7,
         VerifyResult: 8,
         DeterminismResult: 9,
-        UpdateResult: 10
+        UpdateResult: 10,
+        ConvertToPlayerCar: 11,
+        SetGameSpeed: 12
     };
     let initMessage = null;
     let workers = [];
@@ -60,9 +62,19 @@
         };
         worker.onerror = event => {
             state.failed = true;
-            console.error("[PolyTrack TAS] Simulation thread " + (index + 1) + " failed", event && event.message || event);
+            const detail = event && event.message || String(event || "unknown error");
+            console.error("[PolyTrack TAS] Simulation thread " + (index + 1) + " failed", detail);
+            setTimeout(() => {
+                throw new Error("Simulation thread " + (index + 1) + " failed: " + detail)
+            }, 0);
         };
-        worker.onmessageerror = event => console.error("[PolyTrack TAS] Simulation thread " + (index + 1) + " message error", event);
+        worker.onmessageerror = event => {
+            state.failed = true;
+            console.error("[PolyTrack TAS] Simulation thread " + (index + 1) + " message error", event);
+            setTimeout(() => {
+                throw new Error("Simulation thread " + (index + 1) + " returned an unreadable message")
+            }, 0);
+        };
         if (initMessage) worker.postMessage(initMessage);
         return state;
     }
@@ -144,11 +156,15 @@
             }
             case M.StartCar:
             case M.ControlCar:
-            case M.PauseCar: {
+            case M.PauseCar:
+            case M.ConvertToPlayerCar: {
                 const state = carOwners.get(message.carId);
                 if (state) send(state, message);
                 return;
             }
+            case M.SetGameSpeed:
+                for (const state of workers) send(state, message);
+                return;
             case M.Verify: {
                 const state = chooseWorker();
                 if (!state) {

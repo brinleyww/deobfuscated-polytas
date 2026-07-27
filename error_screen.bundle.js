@@ -3,16 +3,16 @@
     var e = {
             540: e => {
                 e.exports = function(e) {
-                    var n = document.createElement("style");
-                    return e.setAttributes(n, e.attributes), e.insert(n, e.options), n
+                    var t = document.createElement("style");
+                    return e.setAttributes(t, e.attributes), e.insert(t, e.options), t
                 }
             },
             1113: e => {
-                e.exports = function(e, n) {
-                    if (n.styleSheet) n.styleSheet.cssText = e;
+                e.exports = function(e, t) {
+                    if (t.styleSheet) t.styleSheet.cssText = e;
                     else {
-                        for (; n.firstChild;) n.removeChild(n.firstChild);
-                        n.appendChild(document.createTextNode(e))
+                        for (; t.firstChild;) t.removeChild(t.firstChild);
+                        t.appendChild(document.createTextNode(e))
                     }
                 }
             },
@@ -21,32 +21,32 @@
                     return e[1]
                 }
             },
-            4503: (e, n, t) => {
-                t.d(n, {
+            4503: (e, t, n) => {
+                n.d(t, {
                     A: () => i
                 });
-                var r = t(1601),
-                    o = t.n(r),
-                    a = t(6314),
-                    c = t.n(a)()(o());
-                c.push([e.id, "#error-screen {\n\tdisplay: flex;\n\tflex-direction: column;\n\tpadding: 10px;\n\tbox-sizing: border-box;\n\tposition: absolute;\n\tleft: 0;\n\ttop: 0;\n\tz-index: 1000;\n\twidth: 100%;\n\theight: 100%;\n\tbackground-color: var(--surface-color);\n}\n\n#error-screen > .title {\n\tfont-size: 28px;\n\tcolor: var(--text-color);\n}\n\n#error-screen > .version, #error-screen > .platform, #error-screen > .user-agent {\n\tfont-size: 20px;\n\tcolor: var(--text-color);\n\topacity: 0.5;\n}\n\n#error-screen > textarea {\n\tmargin: 10px 0;\n\theight: 100%;\n\tflex-grow: 1;\n\tbackground-color: var(--surface-tertiary-color);\n\tborder: none;\n\tresize: none;\n\tcolor: var(--text-color);\n\tword-break: break-word;\n\tfont-size: 20px;\n}\n#error-screen > textarea:focus-visible {\n\toutline: none;\n}\n\n#error-screen > button {\n\talign-self: flex-start;\n}\n", ""]);
+                var r = n(1601),
+                    o = n.n(r),
+                    a = n(6314),
+                    c = n.n(a)()(o());
+                c.push([e.id, "#error-screen {\n\tdisplay: flex;\n\tflex-direction: column;\n\tpadding: max(10px, var(--safe-area-top-unscaled)) max(10px, var(--safe-area-right-unscaled)) max(10px, var(--safe-area-bottom-unscaled)) max(10px, var(--safe-area-left-unscaled));\n\tbox-sizing: border-box;\n\tposition: absolute;\n\tleft: 0;\n\ttop: 0;\n\tz-index: 1000;\n\twidth: 100%;\n\theight: 100%;\n\tbackground-color: var(--surface-color);\n}\n\n#error-screen > .title {\n\tfont-size: 28px;\n\tcolor: var(--text-color);\n}\n\n#error-screen > .version, #error-screen > .platform, #error-screen > .user-agent {\n\tfont-size: 20px;\n\tcolor: var(--text-color);\n\topacity: 0.5;\n}\n\n#error-screen > textarea {\n\tmargin: 10px 0;\n\theight: 100%;\n\tflex-grow: 1;\n\tbackground-color: var(--surface-tertiary-color);\n\tborder: none;\n\tresize: none;\n\tcolor: var(--text-color);\n\tword-break: break-word;\n\tfont-size: 20px;\n}\n#error-screen > textarea:focus-visible {\n\toutline: none;\n}\n\n#error-screen > .button-container {\n\tdisplay: flex;\n}\n\n#error-screen > .button-container > button:first-of-type {\n\tmargin-right: auto;\n}\n", ""]);
                 const i = c
             },
-            5056: (e, n, t) => {
+            5056: (e, t, n) => {
                 e.exports = function(e) {
-                    var n = t.nc;
-                    n && e.setAttribute("nonce", n)
+                    var t = n.nc;
+                    t && e.setAttribute("nonce", t)
                 }
             },
             5072: e => {
-                var n = [];
+                var t = [];
 
-                function t(e) {
-                    for (var t = -1, r = 0; r < n.length; r++)
-                        if (n[r].identifier === e) {
-                            t = r;
+                function n(e) {
+                    for (var n = -1, r = 0; r < t.length; r++)
+                        if (t[r].identifier === e) {
+                            n = r;
                             break
-                        } return t
+                        } return n
                 }
 
                 function r(e, r) {
@@ -56,7 +56,7 @@
                             d = a[l] || 0,
                             u = "".concat(l, " ").concat(d);
                         a[l] = d + 1;
-                        var p = t(u),
+                        var p = n(u),
                             f = {
                                 css: s[1],
                                 media: s[2],
@@ -64,10 +64,10 @@
                                 supports: s[4],
                                 layer: s[5]
                             };
-                        if (-1 !== p) n[p].references++, n[p].updater(f);
+                        if (-1 !== p) t[p].references++, t[p].updater(f);
                         else {
                             var m = o(f, r);
-                            r.byIndex = i, n.splice(i, 0, {
+                            r.byIndex = i, t.splice(i, 0, {
                                 identifier: u,
                                 updater: m,
                                 references: 1
@@ -78,14 +78,14 @@
                     return c
                 }
 
-                function o(e, n) {
-                    var t = n.domAPI(n);
-                    t.update(e);
-                    return function(n) {
-                        if (n) {
-                            if (n.css === e.css && n.media === e.media && n.sourceMap === e.sourceMap && n.supports === e.supports && n.layer === e.layer) return;
-                            t.update(e = n)
-                        } else t.remove()
+                function o(e, t) {
+                    var n = t.domAPI(t);
+                    n.update(e);
+                    return function(t) {
+                        if (t) {
+                            if (t.css === e.css && t.media === e.media && t.sourceMap === e.sourceMap && t.supports === e.supports && t.layer === e.layer) return;
+                            n.update(e = t)
+                        } else n.remove()
                     }
                 }
                 e.exports = function(e, o) {
@@ -93,12 +93,12 @@
                     return function(e) {
                         e = e || [];
                         for (var c = 0; c < a.length; c++) {
-                            var i = t(a[c]);
-                            n[i].references--
+                            var i = n(a[c]);
+                            t[i].references--
                         }
                         for (var s = r(e, o), l = 0; l < a.length; l++) {
-                            var d = t(a[l]);
-                            0 === n[d].references && (n[d].updater(), n.splice(d, 1))
+                            var d = n(a[l]);
+                            0 === t[d].references && (t[d].updater(), t.splice(d, 1))
                         }
                         a = s
                     }
@@ -106,14 +106,14 @@
             },
             6314: e => {
                 e.exports = function(e) {
-                    var n = [];
-                    return n.toString = function() {
-                        return this.map((function(n) {
-                            var t = "",
-                                r = void 0 !== n[5];
-                            return n[4] && (t += "@supports (".concat(n[4], ") {")), n[2] && (t += "@media ".concat(n[2], " {")), r && (t += "@layer".concat(n[5].length > 0 ? " ".concat(n[5]) : "", " {")), t += e(n), r && (t += "}"), n[2] && (t += "}"), n[4] && (t += "}"), t
+                    var t = [];
+                    return t.toString = function() {
+                        return this.map((function(t) {
+                            var n = "",
+                                r = void 0 !== t[5];
+                            return t[4] && (n += "@supports (".concat(t[4], ") {")), t[2] && (n += "@media ".concat(t[2], " {")), r && (n += "@layer".concat(t[5].length > 0 ? " ".concat(t[5]) : "", " {")), n += e(t), r && (n += "}"), t[2] && (n += "}"), t[4] && (n += "}"), n
                         })).join("")
-                    }, n.i = function(e, t, r, o, a) {
+                    }, t.i = function(e, n, r, o, a) {
                         "string" == typeof e && (e = [
                             [null, e, void 0]
                         ]);
@@ -125,28 +125,28 @@
                             }
                         for (var l = 0; l < e.length; l++) {
                             var d = [].concat(e[l]);
-                            r && c[d[0]] || (void 0 !== a && (void 0 === d[5] || (d[1] = "@layer".concat(d[5].length > 0 ? " ".concat(d[5]) : "", " {").concat(d[1], "}")), d[5] = a), t && (d[2] ? (d[1] = "@media ".concat(d[2], " {").concat(d[1], "}"), d[2] = t) : d[2] = t), o && (d[4] ? (d[1] = "@supports (".concat(d[4], ") {").concat(d[1], "}"), d[4] = o) : d[4] = "".concat(o)), n.push(d))
+                            r && c[d[0]] || (void 0 !== a && (void 0 === d[5] || (d[1] = "@layer".concat(d[5].length > 0 ? " ".concat(d[5]) : "", " {").concat(d[1], "}")), d[5] = a), n && (d[2] ? (d[1] = "@media ".concat(d[2], " {").concat(d[1], "}"), d[2] = n) : d[2] = n), o && (d[4] ? (d[1] = "@supports (".concat(d[4], ") {").concat(d[1], "}"), d[4] = o) : d[4] = "".concat(o)), t.push(d))
                         }
-                    }, n
+                    }, t
                 }
             },
             7659: e => {
-                var n = {};
-                e.exports = function(e, t) {
+                var t = {};
+                e.exports = function(e, n) {
                     var r = function(e) {
-                        if (void 0 === n[e]) {
-                            var t = document.querySelector(e);
-                            if (window.HTMLIFrameElement && t instanceof window.HTMLIFrameElement) try {
-                                t = t.contentDocument.head
+                        if (void 0 === t[e]) {
+                            var n = document.querySelector(e);
+                            if (window.HTMLIFrameElement && n instanceof window.HTMLIFrameElement) try {
+                                n = n.contentDocument.head
                             } catch (e) {
-                                t = null
+                                n = null
                             }
-                            n[e] = t
+                            t[e] = n
                         }
-                        return n[e]
+                        return t[e]
                     }(e);
                     if (!r) throw new Error("Couldn't find a style target. This probably means that the value for the 'insert' parameter is invalid.");
-                    r.appendChild(t)
+                    r.appendChild(n)
                 }
             },
             7825: e => {
@@ -155,100 +155,138 @@
                         update: function() {},
                         remove: function() {}
                     };
-                    var n = e.insertStyleElement(e);
+                    var t = e.insertStyleElement(e);
                     return {
-                        update: function(t) {
-                            ! function(e, n, t) {
+                        update: function(n) {
+                            ! function(e, t, n) {
                                 var r = "";
-                                t.supports && (r += "@supports (".concat(t.supports, ") {")), t.media && (r += "@media ".concat(t.media, " {"));
-                                var o = void 0 !== t.layer;
-                                o && (r += "@layer".concat(t.layer.length > 0 ? " ".concat(t.layer) : "", " {")), r += t.css, o && (r += "}"), t.media && (r += "}"), t.supports && (r += "}");
-                                var a = t.sourceMap;
-                                a && "undefined" != typeof btoa && (r += "\n/*# sourceMappingURL=data:application/json;base64,".concat(btoa(unescape(encodeURIComponent(JSON.stringify(a)))), " */")), n.styleTagTransform(r, e, n.options)
-                            }(n, e, t)
+                                n.supports && (r += "@supports (".concat(n.supports, ") {")), n.media && (r += "@media ".concat(n.media, " {"));
+                                var o = void 0 !== n.layer;
+                                o && (r += "@layer".concat(n.layer.length > 0 ? " ".concat(n.layer) : "", " {")), r += n.css, o && (r += "}"), n.media && (r += "}"), n.supports && (r += "}");
+                                var a = n.sourceMap;
+                                a && "undefined" != typeof btoa && (r += "\n/*# sourceMappingURL=data:application/json;base64,".concat(btoa(unescape(encodeURIComponent(JSON.stringify(a)))), " */")), t.styleTagTransform(r, e, t.options)
+                            }(t, e, n)
                         },
                         remove: function() {
                             ! function(e) {
                                 if (null === e.parentNode) return !1;
                                 e.parentNode.removeChild(e)
-                            }(n)
+                            }(t)
                         }
                     }
                 }
             }
         },
-        n = {};
+        t = {};
 
-    function t(r) {
-        var o = n[r];
+    function n(r) {
+        var o = t[r];
         if (void 0 !== o) return o.exports;
-        var a = n[r] = {
+        var a = t[r] = {
             id: r,
             exports: {}
         };
-        return e[r](a, a.exports, t), a.exports
+        return e[r](a, a.exports, n), a.exports
     }
-    t.n = e => {
-        var n = e && e.__esModule ? () => e.default : () => e;
-        return t.d(n, {
-            a: n
-        }), n
-    }, t.d = (e, n) => {
-        for (var r in n) t.o(n, r) && !t.o(e, r) && Object.defineProperty(e, r, {
+    n.n = e => {
+        var t = e && e.__esModule ? () => e.default : () => e;
+        return n.d(t, {
+            a: t
+        }), t
+    }, n.d = (e, t) => {
+        for (var r in t) n.o(t, r) && !n.o(e, r) && Object.defineProperty(e, r, {
             enumerable: !0,
-            get: n[r]
+            get: t[r]
         })
-    }, t.o = (e, n) => Object.prototype.hasOwnProperty.call(e, n), t.nc = void 0;
-    var r = t(5072),
-        o = t.n(r),
-        a = t(7825),
-        c = t.n(a),
-        i = t(7659),
-        s = t.n(i),
-        l = t(5056),
-        d = t.n(l),
-        u = t(540),
-        p = t.n(u),
-        f = t(1113),
-        m = t.n(f),
-        v = t(4503),
+    }, n.o = (e, t) => Object.prototype.hasOwnProperty.call(e, t), n.nc = void 0;
+    var r = n(5072),
+        o = n.n(r),
+        a = n(7825),
+        c = n.n(a),
+        i = n(7659),
+        s = n.n(i),
+        l = n(5056),
+        d = n.n(l),
+        u = n(540),
+        p = n.n(u),
+        f = n(1113),
+        m = n.n(f),
+        v = n(4503),
         h = {};
     h.styleTagTransform = m(), h.setAttributes = d(), h.insert = s().bind(null, "head"), h.domAPI = c(), h.insertStyleElement = p();
     o()(v.A, h);
     v.A && v.A.locals && v.A.locals;
-    let x = null,
-        g = !1;
+    const x = (() => {
+            let e = "polytrack_v5_";
+            return e += "prod_", e
+        })(),
+        y = {
+            migrationFinishedKey: x + "migrated",
+            startupInfoKey: x + "startup_info",
+            recordKeyPrefix: x + "record_",
+            trackKeyPrefix: x + "track_",
+            userProfileSlotKey: x + "user_slot",
+            userProfileKeyPrefix: x + "user_",
+            isMusicEnabledKey: x + "is_music_enabled",
+            settingsKey: x + "settings",
+            keyBindingsKey: x + "key_bindings",
+            trackSelectionTabKey: x + "selected_track_tab",
+            unlockedCarStylesKey: x + "unlocked_car_styles"
+        };
+    Object.freeze(y);
+    const g = y;
+    let b = null,
+        C = !1;
 
-    function y(e) {
-        if (!g) {
-            if (null == x) {
+    function w(e) {
+        if (!C) {
+            if (null == b) {
                 const e = document.createElement("div");
                 e.id = "error-screen", document.body.appendChild(e);
-                const n = document.createElement("div");
-                n.className = "title", n.textContent = "Oh no! PolyTrack encountered an unexpected error!", e.appendChild(n);
                 const t = document.createElement("div");
-                t.className = "version", t.textContent = "Version: 0.6.0", null != window.polytrackModConfiguration?.modName && (t.textContent += " (Modded)"), e.appendChild(t);
+                t.className = "title", t.textContent = "Oh no! PolyTrack encountered an unexpected error!", e.appendChild(t);
+                const n = document.createElement("div");
+                n.className = "version", n.textContent = "Version: 0.6.2", null != window.polytrackModConfiguration?.modName && (n.textContent += " (Modded)"), e.appendChild(n);
                 const r = document.createElement("div");
-                r.className = "platform", r.textContent = "Platform: electron (" + window.location.hostname + ")", e.appendChild(r);
+                r.className = "platform", r.textContent = "Platform: electron", window.location.hostname.length > 0 && (r.textContent += " (" + window.location.hostname + ")"), e.appendChild(r);
                 const o = document.createElement("div");
                 o.className = "user-agent", o.textContent = "User Agent: " + navigator.userAgent, e.appendChild(o);
                 const a = document.createElement("textarea");
                 a.readOnly = !0, e.appendChild(a);
-                const c = document.createElement("button");
-                c.className = "button", c.textContent = "Close", c.addEventListener("click", (() => {
-                    document.body.removeChild(e), x = null, g = !0
-                })), e.appendChild(c), x = {
+                const c = document.createElement("div");
+                c.className = "button-container", e.appendChild(c);
+                {
+                    const e = document.createElement("button");
+                    e.className = "button", e.textContent = "Quit", e.addEventListener("click", (() => {
+                        window.electron?.quit()
+                    })), c.appendChild(e)
+                }
+                const i = document.createElement("button");
+                i.className = "button", i.textContent = "Close", i.addEventListener("click", (() => {
+                    document.body.removeChild(e), b = null, C = !0
+                })), c.appendChild(i);
+                {
+                    const e = document.createElement("button");
+                    e.className = "button", e.textContent = "Reset Settings", e.addEventListener("click", (() => {
+                        try {
+                            window.localStorage.removeItem(g.settingsKey), e.disabled = !0
+                        } catch (e) {
+                            console.error("Failed to reset settings:", e)
+                        }
+                    })), c.appendChild(e)
+                }
+                b = {
                     element: e,
                     textArea: a
                 }
             }
-            x.textArea.value = e + "\n" + x.textArea.value
+            b.textArea.value = e + "\n" + b.textArea.value
         }
     }
     window.addEventListener("error", (e => {
-        y(`${e.message}\nSource: ${e.filename}\nLine: ${e.lineno.toString()}\nColumn: ${e.colno.toString()}\n`)
+        w(`${e.message}\nSource: ${e.filename}\nLine: ${e.lineno.toString()}\nColumn: ${e.colno.toString()}\n`)
     })), window.addEventListener("unhandledrejection", (e => {
-        let n;
-        e.reason instanceof Error ? (n = `Unhandled Rejection:\n${e.reason.message}`, null != e.reason.stack && (n += `\nStack:\n${e.reason.stack}`)) : n = `Unhandled Rejection:\n${String(e.reason)}`, y(n)
+        let t;
+        e.reason instanceof Error ? (t = `Unhandled Rejection:\n${e.reason.message}`, null != e.reason.stack && (t += `\nStack:\n${e.reason.stack}`)) : t = `Unhandled Rejection:\n${String(e.reason)}`, w(t)
     }))
 })();
